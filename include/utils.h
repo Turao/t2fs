@@ -6,7 +6,6 @@
 #define SUCCESS 0
 #define ERROR -1
 
-
 #if DEBUG
 #define DEBUG_PRINT(format, ...) \
     fflush(stdout); \
@@ -19,7 +18,7 @@
 #define DEBUG_PRINT(format, ...) ;
 #endif
 
-#if ERRORS_INFO
+#if ERRORS_INFO || DEBUG
 #define STDERR_INFO(format, ...) \
     fflush(stderr); \
     fprintf(stderr, "[ERROR]: "); \
@@ -30,5 +29,7 @@
 #else
 #define STDERR_INFO(format, ...)
 #endif
+
+#define RAISE_INIT_ERROR() { STDERR_INFO("Mem. Alloc. Failure"); return ERROR; }
 
 #endif //__UTILS_H

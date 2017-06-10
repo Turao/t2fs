@@ -21,13 +21,13 @@ typedef unsigned int DWORD;
 #pragma pack(push, 1)
 
 /** Boot block */
-struct t2fs_bootBlock {		// Tabela 1 – Descrição dos campos do bloco de boot
+typedef struct t2fs_bootBlock {		// Tabela 1 – Descrição dos campos do bloco de boot
 	char    id[4];		// “T2FS”	Identificação do sistema de arquivo.
 	WORD    version;	// Versão atual desse sistema de arquivos Valor fixo 0x7F0=2017; 1=1º semestre.
 	WORD	blockSize;	// Quantidade de setores que formam um bloco lógico
 	WORD	MFTBlocksSize;	// Quantidade de blocos (conjunto de n setores) usados para armazenar a Master File Table
 	DWORD	diskSectorSize;	// Quantidade total de setores na partição T2FS. Inclui o bloco de boot, MFT e  blocos de dados
-};
+} t2fs_bootBlock;
 
 /** 4-tupla do MFT */
 struct 	t2fs_4tupla {
@@ -39,7 +39,7 @@ struct 	t2fs_4tupla {
 
 /** Registro de diretório (entrada de diretório) */
 #define	MAX_FILE_NAME_SIZE	51
-struct t2fs_record {
+typedef struct t2fs_record {
     BYTE    TypeVal;        	/* TypeVal	Tipo da entrada. Indica se o registro é válido e, se for, o tipo do arquivo (regular ou diretório). */
 				/*	0x00, registro inválido (não associado a nenhum arquivo);
 					0x01, arquivo regular;
@@ -50,7 +50,7 @@ struct t2fs_record {
     DWORD   blocksFileSize; 		/* Tamanho do arquivo, expresso em número de blocos de dados */
     DWORD   bytesFileSize;  		/* Tamanho do arquivo. Expresso em número de bytes.          */
     DWORD   MFTNumber;			/*	Número do registro MFT */
-};
+} t2fs_record;
 
 #pragma pack(pop)
 
