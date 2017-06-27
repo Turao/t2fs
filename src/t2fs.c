@@ -13,14 +13,39 @@
 #include "utils.h"
 
 
+bool _init_t2fs_bootBlock();
+bool _init_mft_info();
 
 #define DEVELOPERS "Arthur Lenz 218316"
 char devs[] = DEVELOPERS;
 
 bool disk_info_initialized = false;
+bool mft_info_initialized = false;
 
 char cwdPath[1048] = "/";
 
+
+
+t2fs_4tupla _mft[32]; //mft size: 512 bytes / 4tuple size: 16 bytes
+bool _init_mft_info()
+{
+ DEBUG_PRINT("Initializing mft root info \n");
+  unsigned char boot_sector[256];
+  if(read_sector (1, boot_sector) != SUCCESS) {
+    STDERR_INFO("MFT info init failure");
+    return false;
+  }
+
+  memcpy(&_mft_bitmap, boot_sector, sizeof(t2fs_4tupla)); 
+  memcpy(&_mft_root, boot_sector+sizeof(t2fs_4tupla), sizeof(t2fs_4tupla));
+
+  printf("atributeType %x\n", _mft_root.atributeType);
+  printf("virtualBlockNumber %x\n", _mft_root.virtualBlockNumber);
+  printf("logicalBlockNumber %x\n", _mft_root.logicalBlockNumber);
+  printf("numberOfContiguosBlocks %x\n", _mft_root.numberOfContiguosBlocks);
+
+  return true;
+}
 
 struct t2fs_bootBlock _bootBlock;
 bool _init_t2fs_bootBlock()
@@ -49,6 +74,7 @@ bool _init_t2fs_bootBlock()
 int identify2 (char *name, int size)
 {
   if(!disk_info_initialized) _init_t2fs_bootBlock();
+  if(!mft_info_initialized) _init_mft_info();
 
   if(size < sizeof(devs)) return ERROR;
   else
@@ -63,6 +89,7 @@ int identify2 (char *name, int size)
 FILE2 create2 (char *filename)
 {
   if(!disk_info_initialized) _init_t2fs_bootBlock();
+  if(!mft_info_initialized) _init_mft_info();
   //to-do
   return ERROR;
 }
@@ -72,6 +99,7 @@ FILE2 create2 (char *filename)
 int delete2 (char *filename)
 {
   if(!disk_info_initialized) _init_t2fs_bootBlock();
+  if(!mft_info_initialized) _init_mft_info();
   //to-do
   return ERROR;
 }
@@ -81,6 +109,7 @@ int delete2 (char *filename)
 FILE2 open2 (char *filename)
 {
   if(!disk_info_initialized) _init_t2fs_bootBlock();
+  if(!mft_info_initialized) _init_mft_info();
   //to-do
   return ERROR;
 }
@@ -90,6 +119,7 @@ FILE2 open2 (char *filename)
 int close2 (FILE2 handle)
 {
   if(!disk_info_initialized) _init_t2fs_bootBlock();
+  if(!mft_info_initialized) _init_mft_info();
   //to-do
   return ERROR;
 }
@@ -99,6 +129,7 @@ int close2 (FILE2 handle)
 int read2 (FILE2 handle, char *buffer, int size)
 {
   if(!disk_info_initialized) _init_t2fs_bootBlock();
+  if(!mft_info_initialized) _init_mft_info();
   //to-do
   return ERROR;
 }
@@ -108,6 +139,7 @@ int read2 (FILE2 handle, char *buffer, int size)
 int write2 (FILE2 handle, char *buffer, int size)
 {
   if(!disk_info_initialized) _init_t2fs_bootBlock();
+  if(!mft_info_initialized) _init_mft_info();
   //to-do
   return ERROR;
 }
@@ -117,6 +149,7 @@ int write2 (FILE2 handle, char *buffer, int size)
 int truncate2 (FILE2 handle)
 {
   if(!disk_info_initialized) _init_t2fs_bootBlock();
+  if(!mft_info_initialized) _init_mft_info();
   //to-do
   return ERROR;
 }
@@ -126,6 +159,7 @@ int truncate2 (FILE2 handle)
 int seek2 (FILE2 handle, DWORD offset)
 {
   if(!disk_info_initialized) _init_t2fs_bootBlock();
+  if(!mft_info_initialized) _init_mft_info();
   //to-do
   return ERROR;
 }
@@ -135,6 +169,7 @@ int seek2 (FILE2 handle, DWORD offset)
 int mkdir2 (char *pathname)
 {
   if(!disk_info_initialized) _init_t2fs_bootBlock();
+  if(!mft_info_initialized) _init_mft_info();
   //to-do
   return ERROR;
 }
@@ -144,6 +179,7 @@ int mkdir2 (char *pathname)
 int rmdir2 (char *pathname)
 {
   if(!disk_info_initialized) _init_t2fs_bootBlock();
+  if(!mft_info_initialized) _init_mft_info();
   //to-do
   return ERROR;
 
@@ -154,6 +190,7 @@ int rmdir2 (char *pathname)
 DIR2 opendir2 (char *pathname)
 {
   if(!disk_info_initialized) _init_t2fs_bootBlock();
+  if(!mft_info_initialized) _init_mft_info();
   //to-do
   return ERROR;
 }
@@ -163,6 +200,7 @@ DIR2 opendir2 (char *pathname)
 int readdir2 (DIR2 handle, DIRENT2 *dentry)
 {
   if(!disk_info_initialized) _init_t2fs_bootBlock();
+  if(!mft_info_initialized) _init_mft_info();
   //to-do
   return ERROR;
 }
@@ -172,6 +210,7 @@ int readdir2 (DIR2 handle, DIRENT2 *dentry)
 int closedir2 (DIR2 handle)
 {
   if(!disk_info_initialized) _init_t2fs_bootBlock();
+  if(!mft_info_initialized) _init_mft_info();
   //to-do
   return ERROR;
 }

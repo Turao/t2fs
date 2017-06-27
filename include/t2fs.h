@@ -30,12 +30,12 @@ typedef struct t2fs_bootBlock {		// Tabela 1 – Descrição dos campos do bloco de 
 } t2fs_bootBlock;
 
 /** 4-tupla do MFT */
-struct 	t2fs_4tupla {
+typedef struct 	t2fs_4tupla {
 	DWORD	atributeType;			// -1: registro MFT livre	0: marcador de fim de encadeamento	1: tupla de mapeamento VBN-LBN	2: registro MFT adicional
 	DWORD	virtualBlockNumber;		// VBN inicial k ou registro MFT adicional
 	DWORD	logicalBlockNumber;		// LBN inicial j
 	DWORD	numberOfContiguosBlocks;	// Quantidade de blocos contíguos ocupados por essa porção do arquivo
-};
+} t2fs_4tupla;
 
 /** Registro de diretório (entrada de diretório) */
 #define	MAX_FILE_NAME_SIZE	51
