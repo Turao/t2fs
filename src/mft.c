@@ -2,7 +2,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#define DEBUG true
+
 #include "mft.h"
+#include "boot.h"
 #include "utils.h"
 
 
@@ -17,36 +20,24 @@ bool init_mft_info()
   read_descriptor(1, descriptor_buffer);
   memcpy(&_root_d, descriptor_buffer, sizeof(descriptor));
 
-  printf("descriptor root: \n");
-  printf("\t tuple 0: \n");
-  printf("\t\t attr: %x \n", _root_d.tuple[0].atributeType);
-  printf("\t\t virtual block number: %x \n", _root_d.tuple[0].virtualBlockNumber);
-  printf("\t\t logical block number: %x \n", _root_d.tuple[0].logicalBlockNumber);
-  printf("\t\t number of contiguous blocks: %x \n", _root_d.tuple[0].numberOfContiguosBlocks);
-
+  printf("\n");
   return true;
 }
 
 
-int descriptor_sector(int descriptor) 
+int descriptor_sector(int descriptor)
 { 
-  return 1 + ((DESCRIPTOR_SIZE * descriptor) / SECTOR_SIZE); //skip boot sector 
+  return _bootBlock.blockSize + //skips boot sector
+  		 ((DESCRIPTOR_SIZE * descriptor) / SECTOR_SIZE); 
 }
 
 
 void read_descriptor(int number, unsigned char buffer[])
 {
   int sector = descriptor_sector(number);
-  if(read_sector(sector, buffer) == ERROR ||
-     read_sector(sector+1, &buffer[256]) == ERROR) {
+  if(read_sector(sector, buffer) != SUCCESS ||
+     read_sector(sector+1, &buffer[256]) != SUCCESS) {
       DEBUG_PRINT("Couldn't read descriptor %d [sector %d]", number, sector);
   }
   else DEBUG_PRINT("Descriptor %d loaded from sectors [%d, %d]", number, sector, sector+1);
-
-
-  for(int i=0; i<512; i++) {
-    if(i%16 == 0) printf(" ");
-    printf("%x", buffer[i]);
-  }
-  printf("\n");
 }
