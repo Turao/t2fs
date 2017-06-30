@@ -21,8 +21,11 @@
 
 char devs[] = DEVELOPERS;
 
+
 bool disk_info_initialized = false;
+#define INIT_DISK_INFO() {init_t2fs_bootBlock(); disk_info_initialized = true;}
 bool mft_info_initialized = false;
+#define INIT_MFT_INFO() {init_mft_info(); mft_info_initialized = true;}
 
 char cwdPath[1048] = "/";
 FILE2 opened[20]; //opened files
@@ -127,8 +130,8 @@ void test_open_root() {
 
 int identify2 (char *name, int size)
 {
-  if(!disk_info_initialized) init_t2fs_bootBlock();
-  if(!mft_info_initialized) init_mft_info();
+  if(!disk_info_initialized) INIT_DISK_INFO();
+  if(!mft_info_initialized) INIT_MFT_INFO();
 
 
   test_open_root();
@@ -146,8 +149,8 @@ int identify2 (char *name, int size)
 
 FILE2 create2 (char *filename)
 {
-  if(!disk_info_initialized) init_t2fs_bootBlock();
-  if(!mft_info_initialized) init_mft_info();
+  if(!disk_info_initialized) INIT_DISK_INFO();
+  if(!mft_info_initialized) INIT_MFT_INFO();
   //to-do
   return ERROR;
 }
@@ -156,8 +159,8 @@ FILE2 create2 (char *filename)
 
 int delete2 (char *filename)
 {
-  if(!disk_info_initialized) init_t2fs_bootBlock();
-  if(!mft_info_initialized) init_mft_info();
+  if(!disk_info_initialized) INIT_DISK_INFO();
+  if(!mft_info_initialized) INIT_MFT_INFO();
   //to-do
   return ERROR;
 }
@@ -166,9 +169,12 @@ int delete2 (char *filename)
 
 FILE2 open2 (char *filename)
 {
-  if(!disk_info_initialized) init_t2fs_bootBlock();
-  if(!mft_info_initialized) init_mft_info();
+  if(!disk_info_initialized) INIT_DISK_INFO();
+  if(!mft_info_initialized) INIT_MFT_INFO();
   //to-do
+
+  printf("filename %s\n", filename);
+
   return ERROR;
 }
 
@@ -176,8 +182,8 @@ FILE2 open2 (char *filename)
 
 int close2 (FILE2 handle)
 {
-  if(!disk_info_initialized) init_t2fs_bootBlock();
-  if(!mft_info_initialized) init_mft_info();
+  if(!disk_info_initialized) INIT_DISK_INFO();
+  if(!mft_info_initialized) INIT_MFT_INFO();
   //to-do
   return ERROR;
 }
@@ -186,8 +192,8 @@ int close2 (FILE2 handle)
 
 int read2 (FILE2 handle, char *buffer, int size)
 {
-  if(!disk_info_initialized) init_t2fs_bootBlock();
-  if(!mft_info_initialized) init_mft_info();
+  if(!disk_info_initialized) INIT_DISK_INFO();
+  if(!mft_info_initialized) INIT_MFT_INFO();
   //to-do
   return ERROR;
 }
@@ -196,8 +202,8 @@ int read2 (FILE2 handle, char *buffer, int size)
 
 int write2 (FILE2 handle, char *buffer, int size)
 {
-  if(!disk_info_initialized) init_t2fs_bootBlock();
-  if(!mft_info_initialized) init_mft_info();
+  if(!disk_info_initialized) INIT_DISK_INFO();
+  if(!mft_info_initialized) INIT_MFT_INFO();
   //to-do
   return ERROR;
 }
@@ -206,8 +212,8 @@ int write2 (FILE2 handle, char *buffer, int size)
 
 int truncate2 (FILE2 handle)
 {
-  if(!disk_info_initialized) init_t2fs_bootBlock();
-  if(!mft_info_initialized) init_mft_info();
+  if(!disk_info_initialized) INIT_DISK_INFO();
+  if(!mft_info_initialized) INIT_MFT_INFO();
   //to-do
   return ERROR;
 }
@@ -216,8 +222,8 @@ int truncate2 (FILE2 handle)
 
 int seek2 (FILE2 handle, DWORD offset)
 {
-  if(!disk_info_initialized) init_t2fs_bootBlock();
-  if(!mft_info_initialized) init_mft_info();
+  if(!disk_info_initialized) INIT_DISK_INFO();
+  if(!mft_info_initialized) INIT_MFT_INFO();
   //to-do
   return ERROR;
 }
@@ -226,8 +232,8 @@ int seek2 (FILE2 handle, DWORD offset)
 
 int mkdir2 (char *pathname)
 {
-  if(!disk_info_initialized) init_t2fs_bootBlock();
-  if(!mft_info_initialized) init_mft_info();
+  if(!disk_info_initialized) INIT_DISK_INFO();
+  if(!mft_info_initialized) INIT_MFT_INFO();
   //to-do
   return ERROR;
 }
@@ -236,8 +242,8 @@ int mkdir2 (char *pathname)
 
 int rmdir2 (char *pathname)
 {
-  if(!disk_info_initialized) init_t2fs_bootBlock();
-  if(!mft_info_initialized) init_mft_info();
+  if(!disk_info_initialized) INIT_DISK_INFO();
+  if(!mft_info_initialized) INIT_MFT_INFO();
   //to-do
   return ERROR;
 
@@ -247,8 +253,8 @@ int rmdir2 (char *pathname)
 
 DIR2 opendir2 (char *pathname)
 {
-  if(!disk_info_initialized) init_t2fs_bootBlock();
-  if(!mft_info_initialized) init_mft_info();
+  if(!disk_info_initialized) INIT_DISK_INFO();
+  if(!mft_info_initialized) INIT_MFT_INFO();
   //to-do
   return ERROR;
 }
@@ -257,8 +263,8 @@ DIR2 opendir2 (char *pathname)
 
 int readdir2 (DIR2 handle, DIRENT2 *dentry)
 {
-  if(!disk_info_initialized) init_t2fs_bootBlock();
-  if(!mft_info_initialized) init_mft_info();
+  if(!disk_info_initialized) INIT_DISK_INFO();
+  if(!mft_info_initialized) INIT_MFT_INFO();
   //to-do
   return ERROR;
 }
@@ -267,8 +273,8 @@ int readdir2 (DIR2 handle, DIRENT2 *dentry)
 
 int closedir2 (DIR2 handle)
 {
-  if(!disk_info_initialized) init_t2fs_bootBlock();
-  if(!mft_info_initialized) init_mft_info();
+  if(!disk_info_initialized) INIT_DISK_INFO();
+  if(!mft_info_initialized) INIT_MFT_INFO();
   //to-do
   return ERROR;
 }
