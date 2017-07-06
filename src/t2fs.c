@@ -109,6 +109,25 @@ void read_file(t2fs_record file_r) {
   list_for_each(&valid_tuples, print_file_data);
 }
 
+
+bool compare_by_name(void* entry, void *name) { //not tested
+  t2fs_record *record = (t2fs_record*) entry;
+  if(strcmp(name, record->name) == 0) {
+    return true;
+  }
+  else return false;
+}
+
+bool exists(char* name, List *entries, t2fs_record *record) { //not tested
+  t2fs_record *found = list_find(entries, compare_by_name, name);
+  if(found) {
+    memcpy(record, found, sizeof(t2fs_record));
+    return true;
+  }
+  else return false;
+}
+
+
 void test_open_root() {
   DEBUG_PRINT("Reading root dir \n");
   List root_entries;
@@ -122,6 +141,11 @@ void test_open_root() {
   for(int i=0; i<list_size(&root_entries); i++) {
     list_at(&root_entries, i, &file);
     read_file(file);
+  }
+
+  t2fs_record record_found;
+  if(exists("file3", &root_entries, &record_found)) {
+    printf("found %s\n", record_found.name);
   }
 
 }
@@ -174,6 +198,8 @@ FILE2 open2 (char *filename)
   //to-do
 
   printf("filename %s\n", filename);
+  
+  
 
   return ERROR;
 }
