@@ -31,6 +31,15 @@ char cwdPath[1048] = "/";
 
 FILE2 opened[20]; //opened files
 
+typedef struct directory {
+  t2fs_record record;
+  List entries;
+  int current_entry;
+} directory;
+
+directory opened_dir[20];
+int _opened_dirs = 0;
+
 int _logicalBlock_sector(int logicalBlockNumber) {
   return logicalBlockNumber * _bootBlock.blockSize;
 }
@@ -190,21 +199,15 @@ int delete2 (char *filename)
   return ERROR;
 }
 
-
-
-FILE2 open2 (char *filename)
+int cd(char* path, t2fs_record *record)
 {
-  if(!disk_info_initialized) INIT_DISK_INFO();
-  if(!mft_info_initialized) INIT_MFT_INFO();
-  //to-do
-
-  printf("filename %s\n", filename);
+  printf("path %s\n", path);
   
   List entries; // lista de entradas
   list_new(&entries, sizeof(t2fs_record), free);
 
   descriptor current_descriptor;
-  if(filename[0] == '/') //inicia pelo descritor do diretorio root
+  if(path[0] == '/') //inicia pelo descritor do diretorio root
     current_descriptor = _root_d;
   else
     current_descriptor = cwdDescriptor;
@@ -213,9 +216,10 @@ FILE2 open2 (char *filename)
   _descriptorEntries(current_descriptor, &entries);
 
   // vai separando pela '/'
-  char* next = strtok(filename, "/");
+  char* next = strtok(path, "/");
   descriptor parent;
   char parentPath[1024];
+  t2fs_record record_found;
   while(next) {
     printf("CWD: %s\n", cwdPath);
 
@@ -238,7 +242,7 @@ FILE2 open2 (char *filename)
       }
     }
 
-    t2fs_record record_found;
+    
     // se a entrada pesquisada existe na lista de entradas do diretorio,
     // teremos o record do diretorio/arquivo desejado em record_found
     if(exists(next, &entries, &record_found)) {
@@ -266,10 +270,20 @@ FILE2 open2 (char *filename)
   }
 
   printf("CWD: %s\n", cwdPath);
-  printf("parabens, este arquivo existe!\n");
-  //to-do: return arquivo FILE2
+  memcpy(record, &record_found, sizeof(t2fs_record));
 
-  return ERROR;
+  return SUCCESS;
+}
+
+
+FILE2 open2 (char *filename)
+{
+  if(!disk_info_initialized) INIT_DISK_INFO();
+  if(!mft_info_initialized) INIT_MFT_INFO();
+  //to-do :: finish tests
+  t2fs_record file_r;
+  int status = cd(filename, &file_r);
+  return status;
 }
 
 
@@ -349,7 +363,42 @@ DIR2 opendir2 (char *pathname)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
-  //to-do
+
+  // maximo de 20 diretorios abertos simultaneamente
+  // (especificado)
+  if(_opened_dirs >= 20) return ERROR; 
+
+  // tenta acessar o caminho especificado
+  // se existir, pega o record do diretorio desejado
+  directory dir;
+  t2fs_record record;
+  if(cd(pathname, &dir.record) == SUCCESS) {
+    // pega o descritor do diretorio, para buscar
+    // as entradas
+    descriptor dir_descriptor;
+    if(dir.record.MFTNumber == 0) // o root tem o record bugado
+      get_descriptor(1, &dir_descriptor);
+    else 
+      get_descriptor(dir.record.MFTNumber, &dir_descriptor);
+
+    // coloca as entradas validas do diretorio
+    // em uma lista
+    list_new(&dir.entries, sizeof(t2fs_record), free);
+    _descriptorEntries(dir_descriptor, &dir.entries);
+    // posiciona o ponteiro de entradas (current entry)
+    // na primeira posição valida do diretório
+    dir.current_entry = 0;
+
+    // coloca dir na proxima posicao valida do array de diretorios abertos
+    int position = _opened_dirs;
+    opened_dir[position] = dir;
+
+    _opened_dirs++;
+
+    return position;
+  }
+
+
   return ERROR;
 }
 
@@ -360,7 +409,27 @@ int readdir2 (DIR2 handle, DIRENT2 *dentry)
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
   //to-do
-  return ERROR;
+
+  // posicao invalida: nao existem tantos
+  // arquivos abertos
+  if(handle >= _opened_dirs) return -2; // nao pode usar o -1 do ERROR
+  
+  directory *dir = &opened_dir[handle];
+  if(dir->current_entry < list_size(&dir->entries)) {
+    t2fs_record entry;
+    list_at(&dir->entries, dir->current_entry, &entry);
+
+    strcpy(dentry->name, entry.name);
+    dentry->fileType = entry.TypeVal;
+    dentry->fileSize = entry.bytesFileSize;
+
+    // avanca uma entrada
+    dir->current_entry++;
+
+    return SUCCESS;
+  }
+
+  return -1; // END OF FILE
 }
 
 

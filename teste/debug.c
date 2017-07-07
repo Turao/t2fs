@@ -13,7 +13,13 @@ int main()
 
   printf("\n");
   char filepath[] = "./file1/../../file1";
-  open2(filepath);
+
+  char dirpath[] = ".";
+  int dir = opendir2(dirpath);
+
+  DIRENT2 entry;
+  while(readdir2(dir, &entry) == 0)
+  	printf("entry %s\n", entry.name);
 
   return SUCCESS;
 }
