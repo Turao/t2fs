@@ -28,6 +28,7 @@ bool mft_info_initialized = false;
 #define INIT_MFT_INFO() {init_mft_info(); mft_info_initialized = true;}
 
 char cwdPath[1048] = "/";
+
 FILE2 opened[20]; //opened files
 
 int _logicalBlock_sector(int logicalBlockNumber) {
@@ -199,7 +200,44 @@ FILE2 open2 (char *filename)
 
   printf("filename %s\n", filename);
   
-  
+  List entries; // lista de entradas
+  list_new(&entries, sizeof(t2fs_record), free);
+
+  descriptor current_descriptor;
+  if(filename[0] == '/') //inicia pelo descritor do diretorio root
+    current_descriptor = _root_d;
+  else
+    current_descriptor = cwdDescriptor;
+
+  // pega entradas do diretorio inicial (root ou atual)
+  _descriptorEntries(_root_d, &entries);
+
+  // vai separando pela '/'
+  char* next = strtok(filename, "/");
+  while(next) {
+    printf("looking for: %s\n", next);
+    if(strcmp(next, ".") == 0) {
+      next = strtok(NULL, "/"); // ignore current path (.)
+    }
+    t2fs_record record_found;
+    // se a entrada pesquisada existe na lista de entradas do diretorio,
+    // teremos o record do diretorio/arquivo desejado em record_found
+    if(exists(next, &entries, &record_found)) {
+      printf("%s found\n", record_found.name);
+      // ja busca o descritor do diretorio/arquivo desejado
+      get_descriptor(record_found.MFTNumber, &current_descriptor);
+
+      // pega a proxima parte do filepath
+      next = strtok(NULL, "/");
+    }
+    else {
+      printf("%s not found\n", next);
+      return ERROR;
+    }
+  }
+
+  printf("parabens, este arquivo existe!\n");
+  //to-do: return arquivo FILE2
 
   return ERROR;
 }

@@ -12,7 +12,8 @@ int main()
   printf("devs: %s\n", devs);
 
   printf("\n");
-  open2("/home/user/file1");
+  char filepath[] = "./file1";
+  open2(filepath);
 
   return SUCCESS;
 }

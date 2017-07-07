@@ -20,6 +20,7 @@ descriptor _bitmap_d;
 descriptor _root_d;
 // descriptor reserved;
 // descriptor reserved;
+descriptor cwdDescriptor;
 
 bool init_mft_info();
 

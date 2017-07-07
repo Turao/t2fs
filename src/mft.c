@@ -15,6 +15,9 @@ bool init_mft_info()
   DEBUG_PRINT("Initializing mft info \n");
   get_descriptor(0, &_bitmap_d);
   get_descriptor(1, &_root_d);
+
+  cwdDescriptor = _root_d;
+
   return true;
 }
 
