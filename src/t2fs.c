@@ -50,12 +50,12 @@ void _descriptorEntries(descriptor d, List *entries)
     list_at(&valid_tuples, i, &tuple);
 
     sector = _logicalBlock_sector(tuple.logicalBlockNumber);
-    printf("\n tuple %d: \n", i);
-    printf("\t logical block %d", tuple.logicalBlockNumber);
-    printf("\t [sector %d] \n", sector);
-    printf("\t virtual block %d \n", tuple.virtualBlockNumber);
-    printf("\t # contiguous blocks %d \n", tuple.numberOfContiguosBlocks);
-    printf("\n");
+    // printf("\n tuple %d: \n", i);
+    // printf("\t logical block %d", tuple.logicalBlockNumber);
+    // printf("\t [sector %d] \n", sector);
+    // printf("\t virtual block %d \n", tuple.virtualBlockNumber);
+    // printf("\t # contiguous blocks %d \n", tuple.numberOfContiguosBlocks);
+    // printf("\n");
 
     read_sector(sector, buffer);
     //for each sector, we have 4 records
@@ -210,21 +210,50 @@ FILE2 open2 (char *filename)
     current_descriptor = cwdDescriptor;
 
   // pega entradas do diretorio inicial (root ou atual)
-  _descriptorEntries(_root_d, &entries);
+  _descriptorEntries(current_descriptor, &entries);
 
   // vai separando pela '/'
   char* next = strtok(filename, "/");
+  descriptor parent;
+  char parentPath[1024];
   while(next) {
-    printf("looking for: %s\n", next);
+    printf("CWD: %s\n", cwdPath);
+
     if(strcmp(next, ".") == 0) {
+      printf("cd .\n");
       next = strtok(NULL, "/"); // ignore current path (.)
+      continue;
     }
+
+    if(strcmp(next, "..") == 0) {
+      // olha se esta atualmente no root
+      // (nao pode subir se esta no root)
+      if(strcmp(cwdPath, "/") == 0) return ERROR;
+      else {
+        current_descriptor = parent;
+        strncpy(cwdPath, parentPath, sizeof(parentPath));
+        printf("cd ..\n");
+        next = strtok(NULL, "/");
+        continue;
+      }
+    }
+
     t2fs_record record_found;
     // se a entrada pesquisada existe na lista de entradas do diretorio,
     // teremos o record do diretorio/arquivo desejado em record_found
     if(exists(next, &entries, &record_found)) {
-      printf("%s found\n", record_found.name);
-      // ja busca o descritor do diretorio/arquivo desejado
+      // printf("%s found\n", record_found.name);
+      printf("cd %s\n", next);
+      
+      // atribui o descritor atual como pai
+      parent = current_descriptor;
+      strncpy(parentPath, cwdPath, sizeof(parentPath));
+
+      // atualiza o current working directory
+      strcat(cwdPath, next);
+      strcat(cwdPath, "/");
+
+      // e ja busca o descritor do diretorio/arquivo encontrado
       get_descriptor(record_found.MFTNumber, &current_descriptor);
 
       // pega a proxima parte do filepath
@@ -236,6 +265,7 @@ FILE2 open2 (char *filename)
     }
   }
 
+  printf("CWD: %s\n", cwdPath);
   printf("parabens, este arquivo existe!\n");
   //to-do: return arquivo FILE2
 

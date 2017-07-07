@@ -12,7 +12,7 @@ int main()
   printf("devs: %s\n", devs);
 
   printf("\n");
-  char filepath[] = "./file1";
+  char filepath[] = "./file1/../../file1";
   open2(filepath);
 
   return SUCCESS;
