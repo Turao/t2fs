@@ -18,8 +18,10 @@ int main()
   int dir = opendir2(dirpath);
 
   DIRENT2 entry;
-  while(readdir2(dir, &entry) == 0)
+  while(readdir2(dir, &entry) == 0) {
   	printf("entry %s\n", entry.name);
+    // closedir2(dir);
+  }
 
   return SUCCESS;
 }

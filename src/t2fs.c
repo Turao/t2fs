@@ -451,6 +451,19 @@ int closedir2 (DIR2 handle)
   if(!mft_info_initialized) INIT_MFT_INFO();
   //to-do
 
+  // posicao invalida
+  // [retorna -2 : nao pode usar o -1 do ERROR]
+  // handle fora do range valido
+  if(handle < 0 || handle >= 20) return -2;
+  // o diretorio nao esta aberto
+  if(!opened_dir[handle].beingUsed) return -2;
 
-  return ERROR;
+
+  // se o handle passado for valido
+  // so "liberamos" a vaga, setando beingUsed
+  // para falso
+  opened_dir[handle].beingUsed = false;
+
+
+  return SUCCESS;
 }
