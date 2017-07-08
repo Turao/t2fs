@@ -35,10 +35,10 @@ typedef struct directory {
   t2fs_record record;
   List entries;
   int current_entry;
+  bool beingUsed;
 } directory;
 
-directory opened_dir[20];
-int _opened_dirs = 0;
+directory opened_dir[20] = {0,0,0,false};
 
 int _logicalBlock_sector(int logicalBlockNumber) {
   return logicalBlockNumber * _bootBlock.blockSize;
@@ -135,6 +135,14 @@ bool exists(char* name, List *entries, t2fs_record *record) { //not tested
     return true;
   }
   else return false;
+}
+
+
+int get_valid_dir_handle() {
+  for(int i=0; i<20; i++) {
+    if(!opened_dir[i].beingUsed) return i;
+  }
+  return ERROR;
 }
 
 
@@ -364,14 +372,9 @@ DIR2 opendir2 (char *pathname)
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
 
-  // maximo de 20 diretorios abertos simultaneamente
-  // (especificado)
-  if(_opened_dirs >= 20) return ERROR; 
-
   // tenta acessar o caminho especificado
   // se existir, pega o record do diretorio desejado
   directory dir;
-  t2fs_record record;
   if(cd(pathname, &dir.record) == SUCCESS) {
     // pega o descritor do diretorio, para buscar
     // as entradas
@@ -390,12 +393,17 @@ DIR2 opendir2 (char *pathname)
     dir.current_entry = 0;
 
     // coloca dir na proxima posicao valida do array de diretorios abertos
-    int position = _opened_dirs;
-    opened_dir[position] = dir;
+    int position = get_valid_dir_handle();
 
-    _opened_dirs++;
-
-    return position;
+    if(position >= 0 && position < 20) {
+      dir.beingUsed = true;
+      opened_dir[position] = dir;
+      return position;
+    }
+    else
+      // se nao existe nenhuma posicao valida
+      // (ja tem 20 diretorios abertos)
+      return ERROR;
   }
 
 
@@ -410,9 +418,12 @@ int readdir2 (DIR2 handle, DIRENT2 *dentry)
   if(!mft_info_initialized) INIT_MFT_INFO();
   //to-do
 
-  // posicao invalida: nao existem tantos
-  // arquivos abertos
-  if(handle >= _opened_dirs) return -2; // nao pode usar o -1 do ERROR
+  // posicao invalida
+  // [retorna -2 : nao pode usar o -1 do ERROR]
+  // handle fora do range valido
+  if(handle < 0 || handle >= 20) return -2;
+  // o diretorio nao esta aberto
+  if(!opened_dir[handle].beingUsed) return -2;
   
   directory *dir = &opened_dir[handle];
   if(dir->current_entry < list_size(&dir->entries)) {
@@ -439,5 +450,7 @@ int closedir2 (DIR2 handle)
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
   //to-do
+
+
   return ERROR;
 }
