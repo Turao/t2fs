@@ -120,7 +120,9 @@ void read_file(t2fs_record file_r) {
 }
 
 
-bool compare_by_name(void* entry, void *name) { //not tested
+bool compare_by_name(void* entry, void *name) {
+  // funcao comparadora
+  // recebe um ponteiro para o objeto de tipo t2fs_record
   t2fs_record *record = (t2fs_record*) entry;
   if(strcmp(name, record->name) == 0) {
     return true;
@@ -128,7 +130,9 @@ bool compare_by_name(void* entry, void *name) { //not tested
   else return false;
 }
 
-bool exists(char* name, List *entries, t2fs_record *record) { //not tested
+bool exists(char* name, List *entries, t2fs_record *record) {
+  // procura em uma lista de entradas (do tipo t2fs_record)
+  // o record de nome desejado
   t2fs_record *found = list_find(entries, compare_by_name, name);
   if(found) {
     memcpy(record, found, sizeof(t2fs_record));
@@ -139,6 +143,9 @@ bool exists(char* name, List *entries, t2fs_record *record) { //not tested
 
 
 int get_valid_dir_handle() {
+  // itera sobre o array de diretorios abertos
+  // se um estiver livre (i.e. beingUsed = falso)
+  // retorna a posicao valida
   for(int i=0; i<20; i++) {
     if(!opened_dir[i].beingUsed) return i;
   }
@@ -148,19 +155,31 @@ int get_valid_dir_handle() {
 
 void test_open_root() {
   DEBUG_PRINT("Reading root dir \n");
+  
+  // cria uma lista, para armazenar as entradas do diretorio root
   List root_entries;
   list_new(&root_entries, sizeof(t2fs_record), free);
+
+  // pega as entradas atraves do descritor e coloca
+  // na lista de entradas
   _descriptorEntries(_root_d, &root_entries);
+
+  // passa a funcao de impressao de entrada
+  // (para cada item na lista, essa funcao é chamada)
   list_for_each(&root_entries, print_entry);
 
 
-  // reads all files within the root dir
+  // itera sobre a lista de entradas
+  // se for do tipo arquivo regular, chama a funcao de read_file
   t2fs_record file; //iterator
   for(int i=0; i<list_size(&root_entries); i++) {
     list_at(&root_entries, i, &file);
-    read_file(file);
+    if(file.TypeVal == TYPEVAL_REGULAR)
+      read_file(file);
   }
 
+  // testa a funcao exists
+  // buscando um arquivo na lista de entradas pelo nome desejado
   t2fs_record record_found;
   if(exists("file3", &root_entries, &record_found)) {
     printf("found %s\n", record_found.name);
