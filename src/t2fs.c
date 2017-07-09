@@ -3,7 +3,7 @@
 #include <string.h>
 #include <stdbool.h>
 
-#define DEBUG true
+#define DEBUG false
 
 #include "t2fs.h"
 #include "boot.h"
@@ -159,14 +159,13 @@ int delete2 (char *filename)
 
 int cd(char* path, t2fs_record *record)
 {
-  printf("path %s\n", path);
   if(path == NULL || record == NULL) return ERROR;
   
   List entries; // lista de entradas
   list_new(&entries, sizeof(t2fs_record), free);
 
   descriptor current_descriptor;
-  if(path[0] == '/') //inicia pelo descritor do diretorio root
+  if(path[0] == '/') //path absoluto: inicia pelo descritor do diretorio root
     current_descriptor = _root_d;
   else
     current_descriptor = cwdDescriptor;
@@ -180,10 +179,7 @@ int cd(char* path, t2fs_record *record)
   char parentPath[1024];
   t2fs_record record_found;
   while(next) {
-    printf("CWD: %s\n", cwdPath);
-
     if(strcmp(next, ".") == 0) {
-      printf("cd .\n");
       next = strtok(NULL, "/"); // ignore current path (.)
       continue;
     }
@@ -195,7 +191,6 @@ int cd(char* path, t2fs_record *record)
       else {
         current_descriptor = parent;
         strncpy(cwdPath, parentPath, sizeof(parentPath));
-        printf("cd ..\n");
         next = strtok(NULL, "/");
         continue;
       }
@@ -205,30 +200,25 @@ int cd(char* path, t2fs_record *record)
     // se a entrada pesquisada existe na lista de entradas do diretorio,
     // teremos o record do diretorio/arquivo desejado em record_found
     if(exists(next, &entries, &record_found)) {
-      // printf("%s found\n", record_found.name);
-      printf("cd %s\n", next);
-      
       // atribui o descritor atual como pai
       parent = current_descriptor;
       strncpy(parentPath, cwdPath, sizeof(parentPath));
 
-      // atualiza o current working directory
+      // busca o descritor do diretorio/arquivo encontrado
+      get_descriptor(record_found.MFTNumber, &current_descriptor);
+
+      // e atualiza o current working directory
       strcat(cwdPath, next);
       strcat(cwdPath, "/");
-
-      // e ja busca o descritor do diretorio/arquivo encontrado
-      get_descriptor(record_found.MFTNumber, &current_descriptor);
+      cwdDescriptor = current_descriptor;
 
       // pega a proxima parte do filepath
       next = strtok(NULL, "/");
     }
     else {
-      printf("%s not found\n", next);
       return ERROR;
     }
   }
-
-  printf("CWD: %s\n", cwdPath);
   memcpy(record, &record_found, sizeof(t2fs_record));
 
   return SUCCESS;
@@ -309,46 +299,47 @@ int mkdir2 (char *pathname)
   t2fs_record rec;
   char *next = strtok(pathname, "/");
   char read[1024] = ""; // o que ja foi lido
-  char remainer[1024] = ""; // o que falta ser criado
-  printf("readz: %s\n", next);
   while(cd(next, &rec) != ERROR) {
     strcat(read, next);
     strcat(read, "/");
 
-    next = strtok(NULL, "/");
-    printf("reading %s\n", next);
+    next = strtok(pathname+strlen(read), "/");
   }
-  strcpy(remainer, pathname+strlen(read));
 
+  List entries;
+  list_new(&entries, sizeof(t2fs_record), free);
 
-
-  char* dir_to_create = strtok(remainer, "/");
+  char* dir_to_create = strtok(pathname+strlen(read), "/");
   while(dir_to_create) {
-    printf("creating... %s\n", dir_to_create);
+    strcat(read, dir_to_create);
+    strcat(read, "/");
+    printf("done so far: %s\n", read);
 
+    descriptorEntries(cwdDescriptor, &entries);
+    list_for_each(&entries, print_entry);
     // 1.
-    // create dir descriptor
+    // create dir descriptor & write to disk
     descriptor dir_d;
     int mftNumber = get_free_descriptor(&dir_d);
-    dir_d.tuple[0].atributeType = 1;
-    dir_d.tuple[1].atributeType = 0;
+    for(int i=1; i<32; i++)
+      dir_d.tuple[i].atributeType = -1; // resets descriptor attr types
+
+    dir_d.tuple[0].atributeType = 1; // mapeamento
+    dir_d.tuple[1].atributeType = 0; // fim do encadeamento
 
     dir_d.tuple[0].virtualBlockNumber = 0;
     int free_logical_block = searchBitmap2(0);
-
     if(free_logical_block <= 0)
       return ERROR; // nao foi possivel achar um bloco livre
     
     dir_d.tuple[0].logicalBlockNumber = free_logical_block;
     dir_d.tuple[0].numberOfContiguosBlocks = 0;
+    setBitmap2(dir_d.tuple[0].logicalBlockNumber, 1); // aloca o bloco
 
-    printf("attr %d\n", dir_d.tuple[0].atributeType);
-    printf("vbn %d\n", dir_d.tuple[0].virtualBlockNumber);
-    printf("lbn %d\n", dir_d.tuple[0].logicalBlockNumber);
-    printf("cont. blocks %d\n", dir_d.tuple[0].numberOfContiguosBlocks);
-    // setBitmap2(dir_d.tuple[0].logicalBlockNumber, 1); // aloca o bloco
-
-
+    List dir_tuples;
+    list_new(&dir_tuples, sizeof(t2fs_4tupla), free);
+    write_descriptor(dir_d, &dir_tuples);
+    
     // 2.
     // create record of dir
     t2fs_record dir_r;
@@ -358,23 +349,59 @@ int mkdir2 (char *pathname)
     dir_r.bytesFileSize = 0;
     dir_r.MFTNumber = mftNumber;
 
-    printf("typeval %d\n", dir_r.TypeVal);
-    printf("name %s\n", dir_r.name);
-    printf("blocksFileSize %d\n", dir_r.blocksFileSize);
-    printf("bytesFileSize %d\n", dir_r.bytesFileSize);
-    printf("mftNumber %d\n", dir_r.MFTNumber);
-
-
 
     // 3.
-    // append record of dir to current descriptor list of entries
+    // write record in logical block
+    unsigned char buffer[256] = "";
+    memcpy(buffer, &dir_r, sizeof(t2fs_record));
+    write_sector(logicalBlock_sector(free_logical_block), buffer);
 
 
+    // 4.
+    // append dir tuple to current descriptor list of tuples
+    t2fs_4tupla dir_t;
+    dir_t.atributeType = 1; // mapeamento
+    dir_t.virtualBlockNumber = 0;
+    dir_t.logicalBlockNumber = free_logical_block;
+    dir_t.numberOfContiguosBlocks = 0;
 
-    dir_to_create = strtok(NULL, "/");
+    List cwd_tuples;
+    list_new(&cwd_tuples, sizeof(t2fs_4tupla), free);
+    descriptor_tuples(cwdDescriptor, &cwd_tuples);
+
+    // updates last tuple, to be a valid vbn-lbn mapped tuple (1),
+    // instead of a end tuple (0)
+    t2fs_4tupla *last_tuple = list_pop_back(&cwd_tuples);
+    last_tuple->atributeType = 1;
+    list_push_back(&cwd_tuples, last_tuple);
+    list_push_back(&cwd_tuples, &dir_t);
+
+    t2fs_4tupla end;
+    end.atributeType = 0; // fim de encadeamento
+    end.virtualBlockNumber = 0;
+    end.logicalBlockNumber = 0;
+    end.numberOfContiguosBlocks = 0;
+    list_push_back(&cwd_tuples, &end);
+
+    write_descriptor(cwdDescriptor, &cwd_tuples);
+
+
+    // 5.
+    // refreshes cwdDescriptor global variable
+    get_descriptor(cwdDescriptor.MFTNumber, &cwdDescriptor);
+
+    // 6.
+    // cd created folder
+    cd(dir_to_create, &dir_r);
+
+    if(strlen(read) < strlen(pathname))
+      dir_to_create = strtok(pathname+strlen(read), "/");
+    else dir_to_create = NULL;
+    printf("dir to be created %s\n", dir_to_create);
+    printf("read %s\n", read);
   }
 
-  return ERROR;
+  return SUCCESS;
 }
 
 

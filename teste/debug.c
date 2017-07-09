@@ -16,11 +16,11 @@ int main()
   char dirpath[] = ".";
   int dir = opendir2(dirpath);
 
-  DIRENT2 entry;
-  while(readdir2(dir, &entry) == 0) {
-    printf("entry %s\n", entry.name);
-  }
-  closedir2(dir);
+  // DIRENT2 entry;
+  // while(readdir2(dir, &entry) == 0) {
+  //   printf("entry %s\n", entry.name);
+  // }
+  // closedir2(dir);
 
   // char folder1[] = "./folder1";
   // mkdir2(folder1);

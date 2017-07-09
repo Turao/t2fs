@@ -11,6 +11,7 @@
 #define DESCRIPTOR_SIZE 512
 
 typedef struct descriptor {
+  int MFTNumber;
   // (mft size: 512 bytes / 4-tuple size: 16 bytes) = 32 tuples
   t2fs_4tupla tuple[32];
 } descriptor;
@@ -67,5 +68,8 @@ void descriptor_tuples(descriptor d, List *tuples);
           taken from the given descriptor
 */
 void descriptorEntries(descriptor d, List *entries);
+
+
+int write_descriptor(descriptor d, List *tuples);;
 
 #endif //__MFT_H
