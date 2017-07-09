@@ -39,6 +39,13 @@ bool mft_info_initialized = false;
 }
 
 
+typedef struct file_t {
+  descriptor file_descriptor;
+  t2fs_record record;
+  int stream_position;
+  bool opened;
+} file_t;
+
 typedef struct directory {
   descriptor dir_descriptor;
   t2fs_record record;
@@ -48,13 +55,13 @@ typedef struct directory {
   bool opened;
 } directory;
 
-directory opened_dir[20] = {0, 0, 0, false}; // opened directories
+directory opened_dirs[20] = {0}; // opened directories
 
 t2fs_record root_record = { TYPEVAL_DIRETORIO, "/", 0, 0, 1 };
 directory root_directory;
 directory *cwd;
 
-FILE2 opened[20]; //opened files
+file_t opened_files[20] = {0}; //opened files
 
 
 bool print_entry(void *e) {
@@ -132,7 +139,15 @@ int get_valid_dir_handle() {
   // se um estiver livre (i.e. beingUsed = falso)
   // retorna a posicao valida
   for(int i=0; i<20; i++) {
-    if(!opened_dir[i].opened) return i;
+    if(!opened_dirs[i].opened) return i;
+  }
+  return ERROR;
+}
+
+int get_valid_file_handle() {
+  // vide get_valid_dir_handle
+  for(int i=0; i<20; i++) {
+    if(!opened_files[i].opened) return i;
   }
   return ERROR;
 }
@@ -226,10 +241,45 @@ FILE2 open2 (char *filename)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
-  //to-do :: finish tests
-  t2fs_record file_r;
-  int status = cd(filename, &file_r);
-  return status;
+
+  if(filename[0] == '/') { // caminho absoluto
+    cwd = &root_directory;
+  }
+
+  // temos que colocar o cwd no caminho do arquivo a ser lido
+  t2fs_record record;
+  char *next = strtok(filename, "/");
+  while(cd(next, &record) != ERROR) {
+    next = strtok(NULL, "/");
+  }
+  if(next == NULL) // leu tudo: usuario deu um caminho apenas com
+    return ERROR; // pastas
+
+  char *name = strtok(next, "/");
+  // printf("next %s\n", next);
+  // if(name != NULL) // casos do tipo "/folder1/folder2/arquivo" 
+  //   return ERROR; // onde folder1 existe (cd OK), mas folder2 nao (cd ERROR)
+
+  List entries;
+  list_new(&entries, sizeof(t2fs_record), free);
+  get_descriptor(cwd->dir_descriptor.MFTNumber, &cwd->dir_descriptor);
+  descriptorEntries(cwd->dir_descriptor, &entries);
+  
+  if(!exists(name, &entries, &record)) return ERROR; // arquivo nao existe
+
+  file_t f;
+  f.record = record;
+  get_descriptor(f.record.MFTNumber, &f.file_descriptor);
+  f.stream_position = 0;
+  f.opened = true;
+
+  int position = get_valid_file_handle();
+  if(position == ERROR) return ERROR;
+  opened_files[position] = f;
+
+  read_file(f.record);
+
+  return position;
 }
 
 
@@ -395,6 +445,8 @@ int mkdir2 (char *pathname)
   return SUCCESS;
 }
 
+
+
 bool find_by_tuple_record_name_and_invalidate(void *t, void* n) {
   t2fs_4tupla *tuple = (t2fs_4tupla*) t;
   char *name = (char*) n;
@@ -416,6 +468,8 @@ bool find_by_tuple_record_name_and_invalidate(void *t, void* n) {
   return false;
 }
 
+
+
 int rmdir2 (char *pathname)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
@@ -435,7 +489,6 @@ int rmdir2 (char *pathname)
     return ERROR; // pastas que nao existem
   // 1.
   // free cwd's descriptor (on disk)
-  printf("cwd %s\n", cwd->path);
   List tuples;
   list_new(&tuples, sizeof(t2fs_4tupla), free);
   get_descriptor(cwd->dir_descriptor.MFTNumber, &cwd->dir_descriptor);
@@ -498,7 +551,7 @@ DIR2 opendir2 (char *pathname)
 
   if(position >= 0 && position < 20) {
     dir.opened = true;
-    opened_dir[position] = dir;
+    opened_dirs[position] = dir;
     return position;
   }
   else
@@ -519,9 +572,9 @@ int readdir2 (DIR2 handle, DIRENT2 *dentry)
   // handle fora do range valido
   if(handle < 0 || handle >= 20) return -2;
   // o diretorio nao esta aberto
-  if(!opened_dir[handle].opened) return -2;
+  if(!opened_dirs[handle].opened) return -2;
 
-  directory *dir = &opened_dir[handle];
+  directory *dir = &opened_dirs[handle];
 
   List entries;
   list_new(&entries, sizeof(t2fs_record), free);
@@ -564,13 +617,13 @@ int closedir2 (DIR2 handle)
   // handle fora do range valido
   if(handle < 0 || handle >= 20) return -2;
   // o diretorio nao esta aberto
-  if(!opened_dir[handle].opened) return -2;
+  if(!opened_dirs[handle].opened) return -2;
 
 
   // se o handle passado for valido
   // so "liberamos" a vaga, setando beingUsed
   // para falso
-  opened_dir[handle].opened = false;
+  opened_dirs[handle].opened = false;
 
 
   return SUCCESS;
