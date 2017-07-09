@@ -388,9 +388,9 @@ int mkdir2 (char *pathname)
     list_push_back(&cwd_tuples, &end);
 
     write_descriptor(&cwd->dir_descriptor, &cwd_tuples);
-    printf("tuple lbn (%d) appended to %s descriptor on mft (record %d) (desc %d)\n", 
-      free_logical_block, cwd->record.name,
-      cwd->record.MFTNumber, cwd->dir_descriptor.MFTNumber);
+    // printf("tuple lbn (%d) appended to %s descriptor on mft (record %d) (desc %d)\n", 
+    //   free_logical_block, cwd->record.name,
+    //   cwd->record.MFTNumber, cwd->dir_descriptor.MFTNumber);
 
 
     // 6.
@@ -473,10 +473,17 @@ int readdir2 (DIR2 handle, DIRENT2 *dentry)
   List entries;
   list_new(&entries, sizeof(t2fs_record), free);
   
+  // printf("reading %s\n", dir->record.name);
+
   // refresh descriptor (may not be the same as when it was opened)
   get_descriptor(dir->record.MFTNumber, &dir->dir_descriptor);
+  // printf("on mft %d\n", dir->dir_descriptor.MFTNumber);
+  // printf("first tuple attr %d\n", dir->dir_descriptor.tuple[0].atributeType);
+  // printf("first tuple lbn %d\n", dir->dir_descriptor.tuple[0].logicalBlockNumber);
 
   descriptorEntries(dir->dir_descriptor, &entries);
+  // printf("entries %s: %d\n", dir->record.name, list_size(&entries));
+
 
   // pega a proxima entrada, de acordo com
   // current_entry

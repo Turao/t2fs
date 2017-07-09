@@ -122,9 +122,19 @@ void descriptorEntries(descriptor d, List *entries)
 
 int write_descriptor(descriptor *d, List *tuples)
 {
-  printf("descriptor: %d\t", d->MFTNumber);
+  // printf("descriptor: %d\t", d->MFTNumber);
   int size = list_size(tuples);
   unsigned char buffer[256];
+
+  if(size == 0) // empty descriptor
+  {
+    memset(buffer, 0, sizeof(unsigned char)*256);
+    write_sector(descriptor_sector(d->MFTNumber), buffer);
+    write_sector(descriptor_sector(d->MFTNumber)+1, buffer);
+    return SUCCESS;
+  }
+
+
   for(int i=0; i<size; i++) {
     
     // se encheu o descritor atual, temos que pegar um proximo
