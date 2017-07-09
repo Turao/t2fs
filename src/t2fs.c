@@ -108,7 +108,7 @@ void read_file(t2fs_record file_r) {
 
 
 
-bool compare_by_name(void* entry, void *name) {
+bool compare_record_by_name(void* entry, void *name) {
   // funcao comparadora
   // recebe um ponteiro para o objeto de tipo t2fs_record
   t2fs_record *record = (t2fs_record*) entry;
@@ -124,7 +124,7 @@ bool compare_by_name(void* entry, void *name) {
 bool exists(char* name, List *entries, t2fs_record *record) {
   // procura em uma lista de entradas (do tipo t2fs_record)
   // o record de nome desejado
-  t2fs_record *found = list_find(entries, compare_by_name, name);
+  t2fs_record *found = list_find(entries, compare_record_by_name, name);
   if(found) {
     memcpy(record, found, sizeof(t2fs_record));
     return true;
@@ -145,7 +145,7 @@ int get_valid_dir_handle() {
 }
 
 int get_valid_file_handle() {
-  // vide get_valid_dir_handle
+  // look at get_valid_dir_handle
   for(int i=0; i<20; i++) {
     if(!opened_files[i].opened) return i;
   }
@@ -288,7 +288,20 @@ int close2 (FILE2 handle)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
-  //to-do
+
+  // posicao invalida
+  // [retorna -2 : nao pode usar o -1 do ERROR]
+  // handle fora do range valido
+  if(handle < 0 || handle >= 20) return -2;
+  // o diretorio nao esta aberto
+  if(!opened_files[handle].opened) return -2;
+
+  // se o handle passado for valido
+  // so "liberamos" a vaga, setando beingUsed
+  // para falso
+  opened_files[handle].opened = false;
+
+
   return ERROR;
 }
 
