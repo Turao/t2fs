@@ -28,3 +28,9 @@ bool init_t2fs_bootBlock()
   return true;
 
 }
+
+
+int logicalBlock_sector(int logicalBlockNumber)
+{
+  return logicalBlockNumber * _bootBlock.blockSize;
+}

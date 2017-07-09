@@ -33,6 +33,15 @@ bool init_mft_info();
 void get_descriptor(int number, descriptor *descriptor);
 
 
+/*
+[output] 
+  descriptor: a free descriptor
+
+  int output: descriptor number if succesful | -1 if not
+*/
+int get_free_descriptor(descriptor *descriptor);
+
+
 /* returns the descriptor sector in the disk */
 int descriptor_sector(int descriptor);
 
@@ -48,5 +57,15 @@ void read_descriptor(int number, unsigned char buffer[]);
           taken from the given descriptor
 */
 void descriptor_tuples(descriptor d, List *tuples);
+
+
+/*
+[input]
+  d: mft descriptor
+[output] 
+  entries: a list with all valid entries 
+          taken from the given descriptor
+*/
+void descriptorEntries(descriptor d, List *entries);
 
 #endif //__MFT_H

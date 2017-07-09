@@ -33,50 +33,12 @@ FILE2 opened[20]; //opened files
 
 typedef struct directory {
   t2fs_record record;
-  List entries;
   int current_entry;
   bool beingUsed;
 } directory;
 
 directory opened_dir[20] = {0,0,0,false};
 
-int _logicalBlock_sector(int logicalBlockNumber) {
-  return logicalBlockNumber * _bootBlock.blockSize;
-}
-
-void _descriptorEntries(descriptor d, List *entries)
-{
-  int sector;
-  unsigned char buffer[256];
-  t2fs_record record[4]; //records per sector
-
-  List valid_tuples;
-  list_new(&valid_tuples, sizeof(t2fs_4tupla), free);
-  descriptor_tuples(d, &valid_tuples);
-
-  for(int i=0; i<list_size(&valid_tuples); i++) {
-    t2fs_4tupla tuple; //iterator
-    list_at(&valid_tuples, i, &tuple);
-
-    sector = _logicalBlock_sector(tuple.logicalBlockNumber);
-    // printf("\n tuple %d: \n", i);
-    // printf("\t logical block %d", tuple.logicalBlockNumber);
-    // printf("\t [sector %d] \n", sector);
-    // printf("\t virtual block %d \n", tuple.virtualBlockNumber);
-    // printf("\t # contiguous blocks %d \n", tuple.numberOfContiguosBlocks);
-    // printf("\n");
-
-    read_sector(sector, buffer);
-    //for each sector, we have 4 records
-    // (256 bytes [sector size] / 64 bytes [record size]) = 4
-    memcpy(&record, buffer, sizeof(t2fs_record)*4);
-
-    for(int i=0; i<4; i++) {
-      if(record[i].TypeVal != TYPEVAL_INVALIDO)
-        list_push_back(entries, &record[i]);
-    }
-  }
-}
 
 
 bool print_entry(void *e) {
@@ -92,13 +54,15 @@ bool print_entry(void *e) {
   return true;
 }
 
+
+
 bool print_file_data(void *data) {
   t2fs_4tupla *tuple = (t2fs_4tupla*) data;
   if(tuple == NULL) return false;
 
   // reads the sector, based on the LBN given by the tuple
   unsigned char buffer[256];
-  read_sector(_logicalBlock_sector(tuple->logicalBlockNumber), buffer);
+  read_sector(logicalBlock_sector(tuple->logicalBlockNumber), buffer);
   
   // then, just print its content as a string
   printf("%s\n", buffer);
@@ -120,6 +84,7 @@ void read_file(t2fs_record file_r) {
 }
 
 
+
 bool compare_by_name(void* entry, void *name) {
   // funcao comparadora
   // recebe um ponteiro para o objeto de tipo t2fs_record
@@ -129,6 +94,8 @@ bool compare_by_name(void* entry, void *name) {
   }
   else return false;
 }
+
+
 
 bool exists(char* name, List *entries, t2fs_record *record) {
   // procura em uma lista de entradas (do tipo t2fs_record)
@@ -142,6 +109,7 @@ bool exists(char* name, List *entries, t2fs_record *record) {
 }
 
 
+
 int get_valid_dir_handle() {
   // itera sobre o array de diretorios abertos
   // se um estiver livre (i.e. beingUsed = falso)
@@ -153,50 +121,11 @@ int get_valid_dir_handle() {
 }
 
 
-void test_open_root() {
-  DEBUG_PRINT("Reading root dir \n");
-  
-  // cria uma lista, para armazenar as entradas do diretorio root
-  List root_entries;
-  list_new(&root_entries, sizeof(t2fs_record), free);
-
-  // pega as entradas atraves do descritor e coloca
-  // na lista de entradas
-  _descriptorEntries(_root_d, &root_entries);
-
-  // passa a funcao de impressao de entrada
-  // (para cada item na lista, essa funcao é chamada)
-  list_for_each(&root_entries, print_entry);
-
-
-  // itera sobre a lista de entradas
-  // se for do tipo arquivo regular, chama a funcao de read_file
-  t2fs_record file; //iterator
-  for(int i=0; i<list_size(&root_entries); i++) {
-    list_at(&root_entries, i, &file);
-    if(file.TypeVal == TYPEVAL_REGULAR)
-      read_file(file);
-  }
-
-  // testa a funcao exists
-  // buscando um arquivo na lista de entradas pelo nome desejado
-  t2fs_record record_found;
-  if(exists("file3", &root_entries, &record_found)) {
-    printf("found %s\n", record_found.name);
-  }
-
-}
-
-
 
 int identify2 (char *name, int size)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
-
-
-  test_open_root();
-
 
   if(size < sizeof(devs)) return ERROR;
   else
@@ -226,9 +155,12 @@ int delete2 (char *filename)
   return ERROR;
 }
 
+
+
 int cd(char* path, t2fs_record *record)
 {
   printf("path %s\n", path);
+  if(path == NULL || record == NULL) return ERROR;
   
   List entries; // lista de entradas
   list_new(&entries, sizeof(t2fs_record), free);
@@ -240,7 +172,7 @@ int cd(char* path, t2fs_record *record)
     current_descriptor = cwdDescriptor;
 
   // pega entradas do diretorio inicial (root ou atual)
-  _descriptorEntries(current_descriptor, &entries);
+  descriptorEntries(current_descriptor, &entries);
 
   // vai separando pela '/'
   char* next = strtok(path, "/");
@@ -301,6 +233,7 @@ int cd(char* path, t2fs_record *record)
 
   return SUCCESS;
 }
+
 
 
 FILE2 open2 (char *filename)
@@ -370,6 +303,77 @@ int mkdir2 (char *pathname)
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
   //to-do
+
+  // temos que descobrir ate onde as pastas ja existem
+  // e criar o resto
+  t2fs_record rec;
+  char *next = strtok(pathname, "/");
+  char read[1024] = ""; // o que ja foi lido
+  char remainer[1024] = ""; // o que falta ser criado
+  printf("readz: %s\n", next);
+  while(cd(next, &rec) != ERROR) {
+    strcat(read, next);
+    strcat(read, "/");
+
+    next = strtok(NULL, "/");
+    printf("reading %s\n", next);
+  }
+  strcpy(remainer, pathname+strlen(read));
+
+
+
+  char* dir_to_create = strtok(remainer, "/");
+  while(dir_to_create) {
+    printf("creating... %s\n", dir_to_create);
+
+    // 1.
+    // create dir descriptor
+    descriptor dir_d;
+    int mftNumber = get_free_descriptor(&dir_d);
+    dir_d.tuple[0].atributeType = 1;
+    dir_d.tuple[1].atributeType = 0;
+
+    dir_d.tuple[0].virtualBlockNumber = 0;
+    int free_logical_block = searchBitmap2(0);
+
+    if(free_logical_block <= 0)
+      return ERROR; // nao foi possivel achar um bloco livre
+    
+    dir_d.tuple[0].logicalBlockNumber = free_logical_block;
+    dir_d.tuple[0].numberOfContiguosBlocks = 0;
+
+    printf("attr %d\n", dir_d.tuple[0].atributeType);
+    printf("vbn %d\n", dir_d.tuple[0].virtualBlockNumber);
+    printf("lbn %d\n", dir_d.tuple[0].logicalBlockNumber);
+    printf("cont. blocks %d\n", dir_d.tuple[0].numberOfContiguosBlocks);
+    // setBitmap2(dir_d.tuple[0].logicalBlockNumber, 1); // aloca o bloco
+
+
+    // 2.
+    // create record of dir
+    t2fs_record dir_r;
+    dir_r.TypeVal = TYPEVAL_DIRETORIO;
+    strcpy(dir_r.name, dir_to_create);
+    dir_r.blocksFileSize = 0;
+    dir_r.bytesFileSize = 0;
+    dir_r.MFTNumber = mftNumber;
+
+    printf("typeval %d\n", dir_r.TypeVal);
+    printf("name %s\n", dir_r.name);
+    printf("blocksFileSize %d\n", dir_r.blocksFileSize);
+    printf("bytesFileSize %d\n", dir_r.bytesFileSize);
+    printf("mftNumber %d\n", dir_r.MFTNumber);
+
+
+
+    // 3.
+    // append record of dir to current descriptor list of entries
+
+
+
+    dir_to_create = strtok(NULL, "/");
+  }
+
   return ERROR;
 }
 
@@ -403,10 +407,6 @@ DIR2 opendir2 (char *pathname)
     else 
       get_descriptor(dir.record.MFTNumber, &dir_descriptor);
 
-    // coloca as entradas validas do diretorio
-    // em uma lista
-    list_new(&dir.entries, sizeof(t2fs_record), free);
-    _descriptorEntries(dir_descriptor, &dir.entries);
     // posiciona o ponteiro de entradas (current entry)
     // na primeira posição valida do diretório
     dir.current_entry = 0;
@@ -444,11 +444,30 @@ int readdir2 (DIR2 handle, DIRENT2 *dentry)
   // o diretorio nao esta aberto
   if(!opened_dir[handle].beingUsed) return -2;
   
+  
   directory *dir = &opened_dir[handle];
-  if(dir->current_entry < list_size(&dir->entries)) {
-    t2fs_record entry;
-    list_at(&dir->entries, dir->current_entry, &entry);
 
+  // pega a lista de entradas, 
+  // atraves do descritor do diretorio atual
+  descriptor dir_d;
+  if(dir->record.MFTNumber == 0) // o root tem o record bugado
+      get_descriptor(1, &dir_d);
+    else 
+      get_descriptor(dir->record.MFTNumber, &dir_d);
+  
+  List entries;
+  list_new(&entries, sizeof(t2fs_record), free);
+  descriptorEntries(dir_d, &entries);
+  list_for_each(&entries, print_entry);
+
+
+  // pega a proxima entrada, de acordo com
+  // current_entry
+  if(dir->current_entry < list_size(&entries)) {
+    t2fs_record entry;
+    list_at(&entries, dir->current_entry, &entry);
+
+    // seta os atributos de dentry que sera retornado
     strcpy(dentry->name, entry.name);
     dentry->fileType = entry.TypeVal;
     dentry->fileSize = entry.bytesFileSize;

@@ -71,11 +71,8 @@ void* list_remove(List *list, compfunction compFn, void *element);
 
 
 
-void list_for_each(List *list, listIterator iterator); //not sure if i'll need something like that
+void list_for_each(List *list, listIterator iterator);
 void* list_find(List *list, compfunction compFn, void* element);
-
-
-// bool swap(TCB_l *a, TCB_l *b); // may not need it
 
  
 #endif

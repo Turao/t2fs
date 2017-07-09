@@ -10,4 +10,6 @@ t2fs_bootBlock _bootBlock;
 
 bool init_t2fs_bootBlock();
 
+int logicalBlock_sector(int logicalBlockNumber);
+
 #endif // __BOOT_H
