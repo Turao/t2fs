@@ -14,7 +14,7 @@ int main()
   printf("\n");
 
   // opendir OK (para root)
-  char dirpath[] = "/";
+  char dirpath[] = "/folder1";
   int dir = opendir2(dirpath);
   printf("dir %d\n", dir);
 
@@ -26,12 +26,9 @@ int main()
   closedir2(dir);
 
 
-  char folder[] = "./folder1/folder2/";
-  mkdir2(folder);
+  // char folder[] = "./folder1/folder2/";
+  // mkdir2(folder);
 
-
-  // char folder2[] = "./folder2/folder3";
-  // mkdir2(folder2);
 
   return SUCCESS;
 }

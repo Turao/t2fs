@@ -183,10 +183,6 @@ int cd(char* path, t2fs_record *record)
   // pega entradas do diretorio inicial (root ou atual)
   descriptorEntries(cwd->dir_descriptor, &entries);
 
-  printf("************** cd %s  (cwd %s ) ********** \n", path, cwd->path);
-  printf("printing (%s) entries \n", cwd->path);
-  list_for_each(&entries, print_entry);
-
   if(strcmp(path, ".") == 0) {
     // diretorio atual. nao fazer nada
     return SUCCESS;
@@ -203,12 +199,11 @@ int cd(char* path, t2fs_record *record)
   // se a entrada pesquisada existe na lista de entradas do diretorio,
   // teremos o record do diretorio/arquivo desejado em record_found
   if(exists(path, &entries, record)) {
-    printf("[cd] achou %s\n", path);
     if(record->TypeVal != TYPEVAL_DIRETORIO) return ERROR;
     // encontramos a pasta. criamos um diretorio
     directory *found = calloc(1, sizeof(directory));
     memcpy(&found->record, record, sizeof(t2fs_record));
-    get_descriptor(found->record.MFTNumber, &cwd->dir_descriptor);
+    get_descriptor(found->record.MFTNumber, &found->dir_descriptor);
     found->parent = cwd;
     strcpy(found->path, found->parent->path);
     strcat(found->path, path);
@@ -316,9 +311,6 @@ int mkdir2 (char *pathname)
   list_new(&entries, sizeof(t2fs_record), free);
 
   while(next) {
-    descriptorEntries(cwd->dir_descriptor, &entries);
-    list_for_each(&entries, print_entry);
-
     directory new_dir;
     // new_dir.dir_descriptor; // below (1)
     // new_dir.record; // below (2)
@@ -330,27 +322,21 @@ int mkdir2 (char *pathname)
     new_dir.opened = false;
 
     // 1.
-    // create dir descriptor & write to disk
+    // find free mft descriptor to hold the new directory's entries
     int mftNumber = get_free_descriptor(&new_dir.dir_descriptor);
     for(int i=1; i<32; i++)
-      new_dir.dir_descriptor.tuple[i].atributeType = -1; // resets descriptor attr types
+      new_dir.dir_descriptor.tuple[i].atributeType = 0; // resets descriptor attr types
 
-    new_dir.dir_descriptor.tuple[0].atributeType = 1; // mapeamento
-    new_dir.dir_descriptor.tuple[1].atributeType = 0; // fim do encadeamento
-
-    new_dir.dir_descriptor.tuple[0].virtualBlockNumber = 0;
     int free_logical_block = searchBitmap2(0);
     if(free_logical_block <= 0)
       return ERROR; // nao foi possivel achar um bloco livre
-    
-    new_dir.dir_descriptor.tuple[0].logicalBlockNumber = free_logical_block;
-    new_dir.dir_descriptor.tuple[0].numberOfContiguosBlocks = 0;
-    setBitmap2(new_dir.dir_descriptor.tuple[0].logicalBlockNumber, 1); // aloca o bloco
+    setBitmap2(free_logical_block, 1); // aloca o bloco
 
     List dir_tuples;
     list_new(&dir_tuples, sizeof(t2fs_4tupla), free);
     write_descriptor(&new_dir.dir_descriptor, &dir_tuples);
     
+
     // 2.
     // create record of dir
     new_dir.record.TypeVal = TYPEVAL_DIRETORIO;
@@ -359,10 +345,12 @@ int mkdir2 (char *pathname)
     new_dir.record.bytesFileSize = 0;
     new_dir.record.MFTNumber = mftNumber;
 
+    // printf("writing %s to logic block %d\n",new_dir.record.name, free_logical_block);
     // printf("newdir record name %s\n", new_dir.record.name);
     // printf("newdir record blocks %d\n", new_dir.record.blocksFileSize);
     // printf("newdir record bytes %d\n", new_dir.record.bytesFileSize);
     // printf("newdir record mft %d\n", new_dir.record.MFTNumber);
+    // printf("\n");
 
 
     // 3.
@@ -400,6 +388,9 @@ int mkdir2 (char *pathname)
     list_push_back(&cwd_tuples, &end);
 
     write_descriptor(&cwd->dir_descriptor, &cwd_tuples);
+    printf("tuple lbn (%d) appended to %s descriptor on mft (record %d) (desc %d)\n", 
+      free_logical_block, cwd->record.name,
+      cwd->record.MFTNumber, cwd->dir_descriptor.MFTNumber);
 
 
     // 6.
@@ -481,6 +472,10 @@ int readdir2 (DIR2 handle, DIRENT2 *dentry)
 
   List entries;
   list_new(&entries, sizeof(t2fs_record), free);
+  
+  // refresh descriptor (may not be the same as when it was opened)
+  get_descriptor(dir->record.MFTNumber, &dir->dir_descriptor);
+
   descriptorEntries(dir->dir_descriptor, &entries);
 
   // pega a proxima entrada, de acordo com
