@@ -24,21 +24,37 @@ char devs[] = DEVELOPERS;
 
 bool disk_info_initialized = false;
 #define INIT_DISK_INFO() {init_t2fs_bootBlock(); disk_info_initialized = true;}
+
 bool mft_info_initialized = false;
-#define INIT_MFT_INFO() {init_mft_info(); mft_info_initialized = true;}
+#define INIT_MFT_INFO() { init_mft_info(); mft_info_initialized = true; INIT_GLOBALS(); }
 
-char cwdPath[1048] = "/";
+#define INIT_GLOBALS() { \
+  root_directory.dir_descriptor = _root_d; \
+  root_directory.record = root_record; \
+  strcpy(root_directory.path, "/"); \
+  root_directory.parent = NULL; \
+  root_directory.current_entry = 0; \
+  root_directory.opened = false; \
+  cwd = &root_directory; \
+}
 
-FILE2 opened[20]; //opened files
 
 typedef struct directory {
+  descriptor dir_descriptor;
   t2fs_record record;
+  char path[1024]; // absolute path
+  struct directory *parent;
   int current_entry;
-  bool beingUsed;
+  bool opened;
 } directory;
 
-directory opened_dir[20] = {0,0,0,false};
+directory opened_dir[20] = {0, 0, 0, false}; // opened directories
 
+t2fs_record root_record = { TYPEVAL_DIRETORIO, "/", 0, 0, 1 };
+directory root_directory;
+directory *cwd;
+
+FILE2 opened[20]; //opened files
 
 
 bool print_entry(void *e) {
@@ -115,7 +131,7 @@ int get_valid_dir_handle() {
   // se um estiver livre (i.e. beingUsed = falso)
   // retorna a posicao valida
   for(int i=0; i<20; i++) {
-    if(!opened_dir[i].beingUsed) return i;
+    if(!opened_dir[i].opened) return i;
   }
   return ERROR;
 }
@@ -164,64 +180,48 @@ int cd(char* path, t2fs_record *record)
   List entries; // lista de entradas
   list_new(&entries, sizeof(t2fs_record), free);
 
-  descriptor current_descriptor;
-  if(path[0] == '/') //path absoluto: inicia pelo descritor do diretorio root
-    current_descriptor = _root_d;
-  else
-    current_descriptor = cwdDescriptor;
-
   // pega entradas do diretorio inicial (root ou atual)
-  descriptorEntries(current_descriptor, &entries);
+  descriptorEntries(cwd->dir_descriptor, &entries);
 
-  // vai separando pela '/'
-  char* next = strtok(path, "/");
-  descriptor parent;
-  char parentPath[1024];
-  t2fs_record record_found;
-  while(next) {
-    if(strcmp(next, ".") == 0) {
-      next = strtok(NULL, "/"); // ignore current path (.)
-      continue;
-    }
+  printf("************** cd %s  (cwd %s ) ********** \n", path, cwd->path);
+  printf("printing (%s) entries \n", cwd->path);
+  list_for_each(&entries, print_entry);
 
-    if(strcmp(next, "..") == 0) {
-      // olha se esta atualmente no root
-      // (nao pode subir se esta no root)
-      if(strcmp(cwdPath, "/") == 0) return ERROR;
-      else {
-        current_descriptor = parent;
-        strncpy(cwdPath, parentPath, sizeof(parentPath));
-        next = strtok(NULL, "/");
-        continue;
-      }
-    }
-
-    
-    // se a entrada pesquisada existe na lista de entradas do diretorio,
-    // teremos o record do diretorio/arquivo desejado em record_found
-    if(exists(next, &entries, &record_found)) {
-      // atribui o descritor atual como pai
-      parent = current_descriptor;
-      strncpy(parentPath, cwdPath, sizeof(parentPath));
-
-      // busca o descritor do diretorio/arquivo encontrado
-      get_descriptor(record_found.MFTNumber, &current_descriptor);
-
-      // e atualiza o current working directory
-      strcat(cwdPath, next);
-      strcat(cwdPath, "/");
-      cwdDescriptor = current_descriptor;
-
-      // pega a proxima parte do filepath
-      next = strtok(NULL, "/");
-    }
-    else {
-      return ERROR;
-    }
+  if(strcmp(path, ".") == 0) {
+    // diretorio atual. nao fazer nada
+    return SUCCESS;
   }
-  memcpy(record, &record_found, sizeof(t2fs_record));
 
-  return SUCCESS;
+  if(strcmp(path, "..") == 0 && cwd->parent != NULL) {
+    // libera o cwd atual e sobe um nivel
+    directory *to_be_freed = cwd;
+    cwd = cwd->parent;
+    free(to_be_freed);
+    return SUCCESS;
+  }
+
+  // se a entrada pesquisada existe na lista de entradas do diretorio,
+  // teremos o record do diretorio/arquivo desejado em record_found
+  if(exists(path, &entries, record)) {
+    printf("[cd] achou %s\n", path);
+    if(record->TypeVal != TYPEVAL_DIRETORIO) return ERROR;
+    // encontramos a pasta. criamos um diretorio
+    directory *found = calloc(1, sizeof(directory));
+    memcpy(&found->record, record, sizeof(t2fs_record));
+    get_descriptor(found->record.MFTNumber, &cwd->dir_descriptor);
+    found->parent = cwd;
+    strcpy(found->path, found->parent->path);
+    strcat(found->path, path);
+
+    found->current_entry = 0;
+    found->opened = false;
+
+    // finalmente, seta o cwd como a pasta encontrada
+    cwd = found;
+
+    return SUCCESS;
+  }
+  else return ERROR;  
 }
 
 
@@ -292,7 +292,7 @@ int mkdir2 (char *pathname)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
-  //to-do
+  // //to-do
 
   // temos que descobrir ate onde as pastas ja existem
   // e criar o resto
@@ -303,57 +303,72 @@ int mkdir2 (char *pathname)
     strcat(read, next);
     strcat(read, "/");
 
-    next = strtok(pathname+strlen(read), "/");
+    next = strtok(NULL, "/");
   }
+  if(next == NULL) // leu tudo: acessou todo o pathname
+    return ERROR; // caminho invalido porque pasta ja existe
+
+  // char remainer[1024] = "";
+  // strcpy(remainer, pathname+strlen(read));
+  // printf("remainer %s\n", remainer);
 
   List entries;
   list_new(&entries, sizeof(t2fs_record), free);
 
-  char* dir_to_create = strtok(pathname+strlen(read), "/");
-  while(dir_to_create) {
-    strcat(read, dir_to_create);
-    strcat(read, "/");
-    printf("done so far: %s\n", read);
-
-    descriptorEntries(cwdDescriptor, &entries);
+  while(next) {
+    descriptorEntries(cwd->dir_descriptor, &entries);
     list_for_each(&entries, print_entry);
+
+    directory new_dir;
+    // new_dir.dir_descriptor; // below (1)
+    // new_dir.record; // below (2)
+    strcpy(new_dir.path, cwd->path);
+    strcat(new_dir.path, next);
+    strcat(new_dir.path, "/");
+    new_dir.parent = cwd;
+    new_dir.current_entry = 0;
+    new_dir.opened = false;
+
     // 1.
     // create dir descriptor & write to disk
-    descriptor dir_d;
-    int mftNumber = get_free_descriptor(&dir_d);
+    int mftNumber = get_free_descriptor(&new_dir.dir_descriptor);
     for(int i=1; i<32; i++)
-      dir_d.tuple[i].atributeType = -1; // resets descriptor attr types
+      new_dir.dir_descriptor.tuple[i].atributeType = -1; // resets descriptor attr types
 
-    dir_d.tuple[0].atributeType = 1; // mapeamento
-    dir_d.tuple[1].atributeType = 0; // fim do encadeamento
+    new_dir.dir_descriptor.tuple[0].atributeType = 1; // mapeamento
+    new_dir.dir_descriptor.tuple[1].atributeType = 0; // fim do encadeamento
 
-    dir_d.tuple[0].virtualBlockNumber = 0;
+    new_dir.dir_descriptor.tuple[0].virtualBlockNumber = 0;
     int free_logical_block = searchBitmap2(0);
     if(free_logical_block <= 0)
       return ERROR; // nao foi possivel achar um bloco livre
     
-    dir_d.tuple[0].logicalBlockNumber = free_logical_block;
-    dir_d.tuple[0].numberOfContiguosBlocks = 0;
-    setBitmap2(dir_d.tuple[0].logicalBlockNumber, 1); // aloca o bloco
+    new_dir.dir_descriptor.tuple[0].logicalBlockNumber = free_logical_block;
+    new_dir.dir_descriptor.tuple[0].numberOfContiguosBlocks = 0;
+    setBitmap2(new_dir.dir_descriptor.tuple[0].logicalBlockNumber, 1); // aloca o bloco
 
     List dir_tuples;
     list_new(&dir_tuples, sizeof(t2fs_4tupla), free);
-    write_descriptor(dir_d, &dir_tuples);
+    write_descriptor(&new_dir.dir_descriptor, &dir_tuples);
     
     // 2.
     // create record of dir
-    t2fs_record dir_r;
-    dir_r.TypeVal = TYPEVAL_DIRETORIO;
-    strcpy(dir_r.name, dir_to_create);
-    dir_r.blocksFileSize = 0;
-    dir_r.bytesFileSize = 0;
-    dir_r.MFTNumber = mftNumber;
+    new_dir.record.TypeVal = TYPEVAL_DIRETORIO;
+    strcpy(new_dir.record.name, next);
+    new_dir.record.blocksFileSize = 0;
+    new_dir.record.bytesFileSize = 0;
+    new_dir.record.MFTNumber = mftNumber;
+
+    // printf("newdir record name %s\n", new_dir.record.name);
+    // printf("newdir record blocks %d\n", new_dir.record.blocksFileSize);
+    // printf("newdir record bytes %d\n", new_dir.record.bytesFileSize);
+    // printf("newdir record mft %d\n", new_dir.record.MFTNumber);
 
 
     // 3.
     // write record in logical block
     unsigned char buffer[256] = "";
-    memcpy(buffer, &dir_r, sizeof(t2fs_record));
+    memcpy(buffer, &new_dir.record, sizeof(t2fs_record));
     write_sector(logicalBlock_sector(free_logical_block), buffer);
 
 
@@ -367,13 +382,14 @@ int mkdir2 (char *pathname)
 
     List cwd_tuples;
     list_new(&cwd_tuples, sizeof(t2fs_4tupla), free);
-    descriptor_tuples(cwdDescriptor, &cwd_tuples);
-
+    descriptor_tuples(cwd->dir_descriptor, &cwd_tuples);
     // updates last tuple, to be a valid vbn-lbn mapped tuple (1),
     // instead of a end tuple (0)
-    t2fs_4tupla *last_tuple = list_pop_back(&cwd_tuples);
-    last_tuple->atributeType = 1;
-    list_push_back(&cwd_tuples, last_tuple);
+    if(list_size(&cwd_tuples) > 0) {
+      t2fs_4tupla *last_tuple = list_pop_back(&cwd_tuples);
+      last_tuple->atributeType = 1;
+      list_push_back(&cwd_tuples, last_tuple);
+    }
     list_push_back(&cwd_tuples, &dir_t);
 
     t2fs_4tupla end;
@@ -383,22 +399,15 @@ int mkdir2 (char *pathname)
     end.numberOfContiguosBlocks = 0;
     list_push_back(&cwd_tuples, &end);
 
-    write_descriptor(cwdDescriptor, &cwd_tuples);
+    write_descriptor(&cwd->dir_descriptor, &cwd_tuples);
 
-
-    // 5.
-    // refreshes cwdDescriptor global variable
-    get_descriptor(cwdDescriptor.MFTNumber, &cwdDescriptor);
 
     // 6.
     // cd created folder
-    cd(dir_to_create, &dir_r);
+    t2fs_record dummy_record; // wont need here
+    cd(next, &dummy_record);
 
-    if(strlen(read) < strlen(pathname))
-      dir_to_create = strtok(pathname+strlen(read), "/");
-    else dir_to_create = NULL;
-    printf("dir to be created %s\n", dir_to_create);
-    printf("read %s\n", read);
+    next = strtok(NULL, "/");
   }
 
   return SUCCESS;
@@ -422,38 +431,36 @@ DIR2 opendir2 (char *pathname)
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
 
-  // tenta acessar o caminho especificado
-  // se existir, pega o record do diretorio desejado
-  directory dir;
-  if(cd(pathname, &dir.record) == SUCCESS) {
-    // pega o descritor do diretorio, para buscar
-    // as entradas
-    descriptor dir_descriptor;
-    if(dir.record.MFTNumber == 0) // o root tem o record bugado
-      get_descriptor(1, &dir_descriptor);
-    else 
-      get_descriptor(dir.record.MFTNumber, &dir_descriptor);
-
-    // posiciona o ponteiro de entradas (current entry)
-    // na primeira posição valida do diretório
-    dir.current_entry = 0;
-
-    // coloca dir na proxima posicao valida do array de diretorios abertos
-    int position = get_valid_dir_handle();
-
-    if(position >= 0 && position < 20) {
-      dir.beingUsed = true;
-      opened_dir[position] = dir;
-      return position;
-    }
-    else
-      // se nao existe nenhuma posicao valida
-      // (ja tem 20 diretorios abertos)
-      return ERROR;
+  if(pathname[0] == '/') { // caminho absoluto
+    cwd = &root_directory;
   }
 
+  // tenta acessar o caminho especificado
+  // se existir, teremos o diretorio em cwd
+  char *next = strtok(pathname, "/");
+  directory dir;
+  while(next != NULL && cd(next, &dir.record) != ERROR) {
+    next = strtok(NULL, "/");
+  }
+  // testa se o path foi completamente parseado
+  if(next != NULL) // se sobrou algo, nao foi
+    return ERROR;
 
-  return ERROR;
+  // copiamos o conteudo de cwd para dir
+  memcpy(&dir, cwd, sizeof(directory));
+
+  // coloca dir na proxima posicao valida do array de diretorios abertos
+  int position = get_valid_dir_handle();
+
+  if(position >= 0 && position < 20) {
+    dir.opened = true;
+    opened_dir[position] = dir;
+    return position;
+  }
+  else
+    // se nao existe nenhuma posicao valida
+    // (ja tem 20 diretorios abertos)
+    return ERROR;
 }
 
 
@@ -462,31 +469,19 @@ int readdir2 (DIR2 handle, DIRENT2 *dentry)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
-  //to-do
 
   // posicao invalida
   // [retorna -2 : nao pode usar o -1 do ERROR]
   // handle fora do range valido
   if(handle < 0 || handle >= 20) return -2;
   // o diretorio nao esta aberto
-  if(!opened_dir[handle].beingUsed) return -2;
-  
-  
+  if(!opened_dir[handle].opened) return -2;
+
   directory *dir = &opened_dir[handle];
 
-  // pega a lista de entradas, 
-  // atraves do descritor do diretorio atual
-  descriptor dir_d;
-  if(dir->record.MFTNumber == 0) // o root tem o record bugado
-      get_descriptor(1, &dir_d);
-    else 
-      get_descriptor(dir->record.MFTNumber, &dir_d);
-  
   List entries;
   list_new(&entries, sizeof(t2fs_record), free);
-  descriptorEntries(dir_d, &entries);
-  list_for_each(&entries, print_entry);
-
+  descriptorEntries(dir->dir_descriptor, &entries);
 
   // pega a proxima entrada, de acordo com
   // current_entry
@@ -514,20 +509,19 @@ int closedir2 (DIR2 handle)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
-  //to-do
 
   // posicao invalida
   // [retorna -2 : nao pode usar o -1 do ERROR]
   // handle fora do range valido
   if(handle < 0 || handle >= 20) return -2;
   // o diretorio nao esta aberto
-  if(!opened_dir[handle].beingUsed) return -2;
+  if(!opened_dir[handle].opened) return -2;
 
 
   // se o handle passado for valido
   // so "liberamos" a vaga, setando beingUsed
   // para falso
-  opened_dir[handle].beingUsed = false;
+  opened_dir[handle].opened = false;
 
 
   return SUCCESS;

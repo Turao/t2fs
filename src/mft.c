@@ -120,7 +120,7 @@ void descriptorEntries(descriptor d, List *entries)
   }
 }
 
-int write_descriptor(descriptor d, List *tuples)
+int write_descriptor(descriptor *d, List *tuples)
 {
   int size = list_size(tuples);
   unsigned char buffer[256];
@@ -129,35 +129,35 @@ int write_descriptor(descriptor d, List *tuples)
     // se encheu o descritor atual, temos que pegar um proximo
     if(i % 32 == 0 && i != 0) {
       // antes, salva o atual
-      memcpy(buffer, &d.tuple[0], sizeof(t2fs_4tupla)*16); // only 256 per write
-      write_sector(descriptor_sector(d.MFTNumber), buffer);
-      memcpy(buffer, &d.tuple[16], sizeof(t2fs_4tupla)*16);
-      write_sector(descriptor_sector(d.MFTNumber)+1, buffer);
+      memcpy(buffer, &d->tuple[0], sizeof(t2fs_4tupla)*16); // only 256 per write
+      write_sector(descriptor_sector(d->MFTNumber), buffer);
+      memcpy(buffer, &d->tuple[16], sizeof(t2fs_4tupla)*16);
+      write_sector(descriptor_sector(d->MFTNumber)+1, buffer);
       
-      if(d.tuple[i].atributeType == 2) {// olha se ja tem outro encadeado
-        get_descriptor(d.tuple[i].virtualBlockNumber, &d);
+      if(d->tuple[i].atributeType == 2) {// olha se ja tem outro encadeado
+        get_descriptor(d->tuple[i].virtualBlockNumber, d);
         continue;
       }
       else {
         // se nao tem, temos que encontrar um descritor mft livre
-        int mftNumber = get_free_descriptor(&d);
+        int mftNumber = get_free_descriptor(d);
         if(mftNumber == ERROR) return ERROR; // nao existe espaco no mft
         
-        d.tuple[i].atributeType = 2; // tupla de encadeamento
-        d.tuple[i].virtualBlockNumber = mftNumber;
+        d->tuple[i].atributeType = 2; // tupla de encadeamento
+        d->tuple[i].virtualBlockNumber = mftNumber;
       }
     }
     else {
       // situacao normal, so sobrescrever a tupla
-      list_at(tuples, i, &d.tuple[i]);
+      list_at(tuples, i, &d->tuple[i]);
     }
   }
 
   // finalmente, escreve o descritor no disco
-  memcpy(buffer, &d.tuple[0], sizeof(t2fs_4tupla)*16); // only 256 per write
-  write_sector(descriptor_sector(d.MFTNumber), buffer);
-  memcpy(buffer, &d.tuple[16], sizeof(t2fs_4tupla)*16);
-  write_sector(descriptor_sector(d.MFTNumber)+1, buffer);
+  memcpy(buffer, &d->tuple[0], sizeof(t2fs_4tupla)*16); // only 256 per write
+  write_sector(descriptor_sector(d->MFTNumber), buffer);
+  memcpy(buffer, &d->tuple[16], sizeof(t2fs_4tupla)*16);
+  write_sector(descriptor_sector(d->MFTNumber)+1, buffer);
 
   return SUCCESS;
 

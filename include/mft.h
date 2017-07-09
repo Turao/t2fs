@@ -70,6 +70,6 @@ void descriptor_tuples(descriptor d, List *tuples);
 void descriptorEntries(descriptor d, List *entries);
 
 
-int write_descriptor(descriptor d, List *tuples);;
+int write_descriptor(descriptor *d, List *tuples);;
 
 #endif //__MFT_H
