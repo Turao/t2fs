@@ -105,7 +105,8 @@ bool compare_by_name(void* entry, void *name) {
   // funcao comparadora
   // recebe um ponteiro para o objeto de tipo t2fs_record
   t2fs_record *record = (t2fs_record*) entry;
-  if(strcmp(name, record->name) == 0) {
+  if(strcmp(name, record->name) == 0 &&
+     record->TypeVal != TYPEVAL_INVALIDO) {
     return true;
   }
   else return false;
@@ -287,7 +288,11 @@ int mkdir2 (char *pathname)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
-  // //to-do
+  
+
+  if(pathname[0] == '/') { // caminho absoluto
+    cwd = &root_directory;
+  }
 
   // temos que descobrir ate onde as pastas ja existem
   // e criar o resto
@@ -390,14 +395,76 @@ int mkdir2 (char *pathname)
   return SUCCESS;
 }
 
+bool find_by_tuple_record_name_and_invalidate(void *t, void* n) {
+  t2fs_4tupla *tuple = (t2fs_4tupla*) t;
+  char *name = (char*) n;
 
+  int sector = logicalBlock_sector(tuple->logicalBlockNumber);
+  unsigned char buffer[256];
+  t2fs_record record[4]; // 4 records per sector
+  read_sector(sector, buffer);
+  memcpy(&record, buffer, sizeof(t2fs_record)*4);
+  for(int i=0; i<4; i++) {
+    if(strcmp(record[i].name, name) == 0 &&
+       record[i].TypeVal != TYPEVAL_INVALIDO) { // achou o registro na tupla
+      memset(&record[i], 0, sizeof(t2fs_record)); // resets the record
+      memcpy(buffer, &record, sizeof(t2fs_record)*4);
+      write_sector(sector, buffer);
+      setBitmap2(tuple->logicalBlockNumber, 0); //frees block
+    }
+  }
+  return false;
+}
 
 int rmdir2 (char *pathname)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
-  //to-do
-  return ERROR;
+  
+  if(pathname[0] == '/') { // caminho absoluto
+    cwd = &root_directory;
+  }
+
+  // temos que colocar o cwd no caminho desejado
+  t2fs_record rec;
+  char *next = strtok(pathname, "/");
+  while(cd(next, &rec) != ERROR) {
+    next = strtok(NULL, "/");
+  }
+  if(next != NULL) // nao leu tudo: usuario deu um caminho com
+    return ERROR; // pastas que nao existem
+  // 1.
+  // free cwd's descriptor (on disk)
+  printf("cwd %s\n", cwd->path);
+  List tuples;
+  list_new(&tuples, sizeof(t2fs_4tupla), free);
+  get_descriptor(cwd->dir_descriptor.MFTNumber, &cwd->dir_descriptor);
+  t2fs_4tupla free_tuple;
+  free_tuple.atributeType = -1; // free
+  list_push_front(&tuples, &free_tuple);
+  write_descriptor(&cwd->dir_descriptor, &tuples);
+
+
+  // 2.
+  // get cwd's parent descriptor tuples
+  List parent_tuples;
+  list_new(&parent_tuples, sizeof(t2fs_4tupla), free);
+  get_descriptor(cwd->parent->dir_descriptor.MFTNumber, 
+                 &cwd->parent->dir_descriptor);
+  descriptor_tuples(cwd->parent->dir_descriptor, &parent_tuples);
+
+  // 4.
+  // find the tuple to be clear, and do it
+  // 5.
+  // frees the block (doing that in the find_by_tuple... function)
+  t2fs_4tupla *tuple = list_find(&parent_tuples, 
+                          find_by_tuple_record_name_and_invalidate,
+                          cwd->record.name);
+
+  if(tuple == NULL) // record not found (consistency error)
+    return ERROR;
+  else
+    return SUCCESS;
 
 }
 
