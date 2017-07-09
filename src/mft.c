@@ -122,7 +122,6 @@ void descriptorEntries(descriptor d, List *entries)
 
 int write_descriptor(descriptor *d, List *tuples)
 {
-  // printf("descriptor: %d\t", d->MFTNumber);
   int size = list_size(tuples);
   unsigned char buffer[256];
 
@@ -161,10 +160,8 @@ int write_descriptor(descriptor *d, List *tuples)
     else {
       // situacao normal, so sobrescrever a tupla
       list_at(tuples, i, &d->tuple[i]);
-      printf("%d ", d->tuple[i].logicalBlockNumber);
     }
   }
-  printf("\n");
 
   // finalmente, escreve o descritor no disco
   memcpy(buffer, &d->tuple[0], sizeof(t2fs_4tupla)*16); // only 256 per write

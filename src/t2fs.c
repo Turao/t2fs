@@ -303,10 +303,6 @@ int mkdir2 (char *pathname)
   if(next == NULL) // leu tudo: acessou todo o pathname
     return ERROR; // caminho invalido porque pasta ja existe
 
-  // char remainer[1024] = "";
-  // strcpy(remainer, pathname+strlen(read));
-  // printf("remainer %s\n", remainer);
-
   List entries;
   list_new(&entries, sizeof(t2fs_record), free);
 
@@ -345,13 +341,6 @@ int mkdir2 (char *pathname)
     new_dir.record.bytesFileSize = 0;
     new_dir.record.MFTNumber = mftNumber;
 
-    // printf("writing %s to logic block %d\n",new_dir.record.name, free_logical_block);
-    // printf("newdir record name %s\n", new_dir.record.name);
-    // printf("newdir record blocks %d\n", new_dir.record.blocksFileSize);
-    // printf("newdir record bytes %d\n", new_dir.record.bytesFileSize);
-    // printf("newdir record mft %d\n", new_dir.record.MFTNumber);
-    // printf("\n");
-
 
     // 3.
     // write record in logical block
@@ -388,9 +377,6 @@ int mkdir2 (char *pathname)
     list_push_back(&cwd_tuples, &end);
 
     write_descriptor(&cwd->dir_descriptor, &cwd_tuples);
-    // printf("tuple lbn (%d) appended to %s descriptor on mft (record %d) (desc %d)\n", 
-    //   free_logical_block, cwd->record.name,
-    //   cwd->record.MFTNumber, cwd->dir_descriptor.MFTNumber);
 
 
     // 6.
@@ -473,16 +459,10 @@ int readdir2 (DIR2 handle, DIRENT2 *dentry)
   List entries;
   list_new(&entries, sizeof(t2fs_record), free);
   
-  // printf("reading %s\n", dir->record.name);
-
   // refresh descriptor (may not be the same as when it was opened)
   get_descriptor(dir->record.MFTNumber, &dir->dir_descriptor);
-  // printf("on mft %d\n", dir->dir_descriptor.MFTNumber);
-  // printf("first tuple attr %d\n", dir->dir_descriptor.tuple[0].atributeType);
-  // printf("first tuple lbn %d\n", dir->dir_descriptor.tuple[0].logicalBlockNumber);
 
   descriptorEntries(dir->dir_descriptor, &entries);
-  // printf("entries %s: %d\n", dir->record.name, list_size(&entries));
 
 
   // pega a proxima entrada, de acordo com
