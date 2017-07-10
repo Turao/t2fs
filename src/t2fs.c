@@ -622,44 +622,8 @@ int read2 (FILE2 handle, char *buffer, int size)
   }
 }
 
-
-
-int write2 (FILE2 handle, char *buffer, int size)
+int save_file(file_t *f)
 {
-  if(!disk_info_initialized) INIT_DISK_INFO();
-  if(!mft_info_initialized) INIT_MFT_INFO();
-
-  // valida o handle:
-  // posicao invalida
-  // [retorna -2 : nao pode usar o -1 do ERROR]
-  // handle fora do range valido
-  if(handle < 0 || handle >= 20) return -2;
-  // o diretorio nao esta aberto
-  if(!opened_files[handle].opened) return -2;
-
-  file_t *f = &opened_files[handle];
-
-  
-  if(f->stream_position + size <= f->record.bytesFileSize) {
-    // sobrescreve (nao ultrapassa o tamanho do original)
-    memcpy(f->data+f->stream_position, buffer, size);
-  }
-  else {
-    // se a escrita ultrapassa o tamanho do arquivo
-
-    // calcula o q precisa sobrescrever
-    int untilEOF = f->record.bytesFileSize - f->stream_position;
-    memcpy(f->data+f->stream_position,
-    buffer, untilEOF);
-
-    int extra = size - untilEOF;
-    strncat(f->data+f->stream_position, buffer+untilEOF, extra); 
-  }
-  // atualiza os atributos do arquivo
-  f->stream_position += size;
-  f->record.bytesFileSize = sizeof(BYTE)*strlen(f->data);
-
-
   // limpa todo o mapeamento atual no mft do arquivo
 
   // pega as tuplas do arquivo mapeado
@@ -713,7 +677,46 @@ int write2 (FILE2 handle, char *buffer, int size)
   // tuplas mapeadas
   write_descriptor(&f->file_descriptor, &new_tuples);
 
-  return size;
+  return SUCCESS;
+}
+
+int write2 (FILE2 handle, char *buffer, int size)
+{
+  if(!disk_info_initialized) INIT_DISK_INFO();
+  if(!mft_info_initialized) INIT_MFT_INFO();
+
+  // valida o handle:
+  // posicao invalida
+  // [retorna -2 : nao pode usar o -1 do ERROR]
+  // handle fora do range valido
+  if(handle < 0 || handle >= 20) return -2;
+  // o diretorio nao esta aberto
+  if(!opened_files[handle].opened) return -2;
+
+  file_t *f = &opened_files[handle];
+
+  
+  if(f->stream_position + size <= f->record.bytesFileSize) {
+    // sobrescreve (nao ultrapassa o tamanho do original)
+    memcpy(f->data+f->stream_position, buffer, size);
+  }
+  else {
+    // se a escrita ultrapassa o tamanho do arquivo
+
+    // calcula o q precisa sobrescrever
+    int untilEOF = f->record.bytesFileSize - f->stream_position;
+    memcpy(f->data+f->stream_position,
+    buffer, untilEOF);
+
+    int extra = size - untilEOF;
+    strncat(f->data+f->stream_position, buffer+untilEOF, extra); 
+  }
+  // atualiza os atributos do arquivo
+  f->stream_position += size;
+  f->record.bytesFileSize = sizeof(BYTE)*strlen(f->data);
+
+
+  return save_file(f);
 }
 
 
@@ -742,7 +745,7 @@ int truncate2 (FILE2 handle)
 
   f->record.bytesFileSize = f->stream_position;
 
-  return SUCCESS;
+  return save_file(f);
 }
 
 
