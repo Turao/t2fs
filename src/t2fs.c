@@ -368,8 +368,7 @@ FILE2 create2 (char *filename)
 bool tuple_cleanup(void *t) {
   t2fs_4tupla *tuple = (t2fs_4tupla*) t;
   setBitmap2(tuple->logicalBlockNumber, 0); // free block
-  memset(&tuple, 0, sizeof(t2fs_4tupla)); // resets
-  tuple->atributeType = -1; // set it freeeeeeeee
+  memset(tuple, -1, sizeof(t2fs_4tupla)); // resets
   return true;
 }
 
@@ -661,8 +660,60 @@ int write2 (FILE2 handle, char *buffer, int size)
   f->record.bytesFileSize = sizeof(BYTE)*strlen(f->data);
 
 
+  // limpa todo o mapeamento atual no mft do arquivo
 
-  return SUCCESS;  
+  // pega as tuplas do arquivo mapeado
+  List tuples;
+  list_new(&tuples, sizeof(t2fs_4tupla), free);
+  get_descriptor(f->file_descriptor.MFTNumber, &f->file_descriptor);
+  descriptor_tuples(f->file_descriptor, &tuples);
+  // para cada tupla:
+  // reseta a tupla na memoria e libera os blocos mapeados por ela
+  list_for_each(&tuples, tuple_cleanup);
+
+  // escreve um novo mapeamento para os dados
+  int blockSize_bytes = _bootBlock.blockSize * SECTOR_SIZE;
+  int blocksNeeded = 1 + (f->record.bytesFileSize / blockSize_bytes);
+
+  // para cada bloco necessario, cria uma tupla de mapeamento
+  // e escreve o dado no disco
+  List new_tuples;
+  list_new(&new_tuples, sizeof(t2fs_4tupla), free);
+  
+  unsigned char internal_buffer[256];
+  int internal_pointer = 0;
+
+  for(int i=0; i<blocksNeeded; i++) {
+    // cria tupla de mapeamento
+    int free_logical_block = searchBitmap2(0);
+    
+    t2fs_4tupla tuple;
+    tuple.atributeType = 1; // mapeamento
+    tuple.virtualBlockNumber = i; // numero do bloco (relativo ao arquivo)
+    tuple.logicalBlockNumber = free_logical_block;
+    tuple.numberOfContiguosBlocks = 0;
+    list_push_back(&new_tuples, &tuple);
+
+    // marca o bloco logico como 'em uso'
+    if(setBitmap2(free_logical_block, 1) != SUCCESS)
+      return ERROR;
+
+    // agora precisamos escrever o bloco
+    int sector = logicalBlock_sector(tuple.logicalBlockNumber);
+    for(int j=0; j<_bootBlock.blockSize; j++) {     
+      // para cada setor dentro do bloco
+      // copiamos os 256 bytes (SECTOR_SIZE) respectivos
+      memcpy(internal_buffer, f->data+internal_pointer, 256);
+      internal_pointer += 256;
+      if(write_sector(sector+j, internal_buffer) != SUCCESS) return ERROR;
+    }
+  }
+
+  // por fim, atualiza o descritor mft com as novas
+  // tuplas mapeadas
+  write_descriptor(&f->file_descriptor, &new_tuples);
+
+  return size;
 }
 
 
