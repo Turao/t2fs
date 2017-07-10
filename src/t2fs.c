@@ -495,11 +495,13 @@ int rmdir2 (char *pathname)
   // temos que colocar o cwd no caminho desejado
   t2fs_record rec;
   char *next = strtok(pathname, "/");
+  if(next == NULL) return ERROR; // nao pode remover root
   while(cd(next, &rec) != ERROR) {
     next = strtok(NULL, "/");
   }
   if(next != NULL) // nao leu tudo: usuario deu um caminho com
     return ERROR; // pastas que nao existem
+
   // 1.
   // free cwd's descriptor (on disk)
   List tuples;
