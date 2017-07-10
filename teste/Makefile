@@ -14,12 +14,16 @@ INC_DIR=../include
 BIN_DIR=./
 SRC_DIR=./
 
-all: debug
+all: debug main
 
-.PHONY: debug
+.PHONY: debug main
 
 debug:
 	$(CC) $(SRC_DIR)/debug.c -o debug -I$(INC_DIR) -L$(LIB_DIR) -lt2fs -Wall -m32
+
+main:
+	$(CC) $(SRC_DIR)/main.c -o main -I$(INC_DIR) -L$(LIB_DIR) -lt2fs -Wall -m32
+
 
 clean:
 	rm -rf $(LIB_DIR)/*.a $(BIN_DIR)/*.o $(SRC_DIR)/*~ $(INC_DIR)/*~ *~

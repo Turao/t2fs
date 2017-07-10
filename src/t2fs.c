@@ -75,7 +75,7 @@ bool exists(char* name, List *entries, t2fs_record *record);
 int get_valid_dir_handle();
 int get_valid_file_handle();
 bool find_by_tuple_record_name_and_invalidate(void *t, void* n);
-
+bool tuple_cleanup(void *t);
 
 bool print_entry(void *e) {
   t2fs_record *record = (t2fs_record*) e;
@@ -264,7 +264,6 @@ FILE2 create2 (char *filename)
   List cwd_tuples;
   list_new(&cwd_tuples, sizeof(t2fs_4tupla), free);
   descriptor_tuples(cwd->dir_descriptor, &cwd_tuples);
-  printf("tuple cwd (%s) size %d \n", cwd->record.name, list_size(&cwd_tuples));
   // updates last tuple, to be a valid vbn-lbn mapped tuple (1),
   // instead of a end tuple (0)
   if(list_size(&cwd_tuples) > 0) {
@@ -280,7 +279,6 @@ FILE2 create2 (char *filename)
   end.logicalBlockNumber = 0;
   end.numberOfContiguosBlocks = 0;
   list_push_back(&cwd_tuples, &end);
-  printf("tuple cwd (%s) size %d \n", cwd->record.name, list_size(&cwd_tuples));
 
   write_descriptor(&cwd->dir_descriptor, &cwd_tuples);
 
@@ -292,12 +290,76 @@ FILE2 create2 (char *filename)
 
 
 
+bool tuple_cleanup(void *t) {
+  t2fs_4tupla *tuple = (t2fs_4tupla*) t;
+  setBitmap2(tuple->logicalBlockNumber, 0); // free block
+  memset(&tuple, 0, sizeof(t2fs_4tupla)); // resets
+  tuple->atributeType = -1; // set it freeeeeeeee
+  return true;
+}
+
 int delete2 (char *filename)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
-  //to-do
-  return ERROR;
+
+  char *path = strdup(filename);
+  if(path == NULL) return ERROR;
+
+  if(path[0] == '/') { // caminho absoluto
+    cwd = &root_directory;
+  }
+
+  // temos que colocar o cwd no caminho do arquivo a ser lido
+  t2fs_record record;
+  char *next;
+  if(strchr(path, '/'))
+    next = strtok(path, "/");
+  else 
+    next = path;
+  while(cd(next, &record) != ERROR) {
+    next = strtok(NULL, "/");
+  }
+  if(next == NULL) // leu tudo: usuario deu um caminho apenas com
+    return ERROR; // pastas
+
+  char *name = next;
+
+  // olhar se o arquivo ja existe
+  List entries;
+  list_new(&entries, sizeof(t2fs_record), free);
+  get_descriptor(cwd->dir_descriptor.MFTNumber, &cwd->dir_descriptor);
+  descriptorEntries(cwd->dir_descriptor, &entries);
+  if(!exists(name, &entries, &record)) return ERROR; // nao pode deletar se nao existe
+
+  
+  file_t f;
+  f.record = record;
+  get_descriptor(f.record.MFTNumber, &f.file_descriptor);
+  
+  // delete and free all blocks mapped
+  // thus, reseting the descriptor
+  List tuples;
+  list_new(&tuples, sizeof(t2fs_4tupla), free);
+  descriptor_tuples(f.file_descriptor, &tuples);
+  list_for_each(&tuples, tuple_cleanup);
+
+  // clears the record on the directory descriptor
+  List cwd_tuples;
+  list_new(&cwd_tuples, sizeof(t2fs_4tupla), free);
+  get_descriptor(cwd->dir_descriptor.MFTNumber, 
+                 &cwd->dir_descriptor);
+  descriptor_tuples(cwd->dir_descriptor, &cwd_tuples);
+
+  // find the tuple to be clear, and do it
+  // frees the block (doing that in the find_by_tuple... function)
+  t2fs_4tupla *tuple = list_find(&cwd_tuples, 
+                          find_by_tuple_record_name_and_invalidate,
+                          f.record.name);
+
+  write_descriptor(&cwd->dir_descriptor, &cwd_tuples);
+
+  return SUCCESS;
 }
 
 
@@ -372,9 +434,6 @@ FILE2 open2 (char *filename)
     return ERROR; // pastas
 
   char *name = next;
-  // printf("next %s\n", next);
-  // if(name != NULL) // casos do tipo "/folder1/folder2/arquivo" 
-  //   return ERROR; // onde folder1 existe (cd OK), mas folder2 nao (cd ERROR)
 
   List entries;
   list_new(&entries, sizeof(t2fs_record), free);
@@ -593,6 +652,7 @@ bool find_by_tuple_record_name_and_invalidate(void *t, void* n) {
       memset(&record[i], 0, sizeof(t2fs_record)); // resets the record
       memcpy(buffer, &record, sizeof(t2fs_record)*4);
       write_sector(sector, buffer);
+      tuple->atributeType = 3; // IGNORE
       setBitmap2(tuple->logicalBlockNumber, 0); //frees block
     }
   }
@@ -628,9 +688,8 @@ int rmdir2 (char *pathname)
   List tuples;
   list_new(&tuples, sizeof(t2fs_4tupla), free);
   get_descriptor(cwd->dir_descriptor.MFTNumber, &cwd->dir_descriptor);
-  t2fs_4tupla free_tuple;
-  free_tuple.atributeType = -1; // free
-  list_push_front(&tuples, &free_tuple);
+  descriptor_tuples(cwd->dir_descriptor, &tuples);
+  list_for_each(&tuples, tuple_cleanup);
   write_descriptor(&cwd->dir_descriptor, &tuples);
 
 
@@ -650,11 +709,12 @@ int rmdir2 (char *pathname)
                           find_by_tuple_record_name_and_invalidate,
                           cwd->record.name);
 
-  if(tuple == NULL) // record not found (consistency error)
+  write_descriptor(&cwd->parent->dir_descriptor, &parent_tuples);
+
+  if(tuple == NULL) //record doesnt exist, consistency error
     return ERROR;
   else
     return SUCCESS;
-
 }
 
 
@@ -719,7 +779,7 @@ int readdir2 (DIR2 handle, DIRENT2 *dentry)
   list_new(&entries, sizeof(t2fs_record), free);
   
   // refresh descriptor (may not be the same as when it was opened)
-  get_descriptor(dir->record.MFTNumber, &dir->dir_descriptor);
+  get_descriptor(dir->dir_descriptor.MFTNumber, &dir->dir_descriptor);
 
   descriptorEntries(dir->dir_descriptor, &entries);
 

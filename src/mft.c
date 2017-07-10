@@ -78,6 +78,10 @@ void descriptor_tuples(descriptor d, List *tuples)
         i = 0;
         break;
 
+      case 3: //ignore
+        i++;
+        break;
+
       default: 
         DEBUG_PRINT("Invalid MFT Attribute Type");
         i++;
@@ -100,21 +104,17 @@ void descriptorEntries(descriptor d, List *entries)
     t2fs_4tupla tuple; //iterator
     list_at(&valid_tuples, i, &tuple);
 
+    if(tuple.atributeType == 3) continue;
+    
     sector = logicalBlock_sector(tuple.logicalBlockNumber);
-    // printf("\n tuple %d: \n", i);
-    // printf("\t logical block %d", tuple.logicalBlockNumber);
-    // printf("\t [sector %d] \n", sector);
-    // printf("\t virtual block %d \n", tuple.virtualBlockNumber);
-    // printf("\t # contiguous blocks %d \n", tuple.numberOfContiguosBlocks);
-    // printf("\n");
-
     read_sector(sector, buffer);
     //for each sector, we have 4 records
     // (256 bytes [sector size] / 64 bytes [record size]) = 4
     memcpy(&record, buffer, sizeof(t2fs_record)*4);
 
     for(int i=0; i<4; i++) {
-      if(record[i].TypeVal != TYPEVAL_INVALIDO)
+      if(record[i].TypeVal == TYPEVAL_DIRETORIO ||
+         record[i].TypeVal == TYPEVAL_REGULAR)
         list_push_back(entries, &record[i]);
     }
   }
