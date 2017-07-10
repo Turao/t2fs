@@ -64,6 +64,19 @@ directory *cwd;
 file_t opened_files[20] = {0}; //opened files
 
 
+
+/* other functions */
+int cd(char* path, t2fs_record *record);
+bool print_entry(void *e);
+bool print_file_data(void *data);
+void read_file(t2fs_record file_r);
+bool compare_record_by_name(void* entry, void *name);
+bool exists(char* name, List *entries, t2fs_record *record);
+int get_valid_dir_handle();
+int get_valid_file_handle();
+bool find_by_tuple_record_name_and_invalidate(void *t, void* n);
+
+
 bool print_entry(void *e) {
   t2fs_record *record = (t2fs_record*) e;
   
@@ -173,8 +186,108 @@ FILE2 create2 (char *filename)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
-  //to-do
-  return ERROR;
+
+  char *path = strdup(filename);
+  if(path == NULL) return ERROR;
+
+  if(path[0] == '/') { // caminho absoluto
+    cwd = &root_directory;
+  }
+
+
+  // temos que colocar o cwd no caminho do arquivo a ser lido
+  t2fs_record record;
+  char *next;
+  if(strchr(path, '/'))
+    next = strtok(path, "/");
+  else 
+    next = path;
+  while(cd(next, &record) != ERROR) {
+    next = strtok(NULL, "/");
+  }
+  if(next == NULL) // leu tudo: usuario deu um caminho apenas com
+    return ERROR; // pastas
+
+  char *name = next;
+
+  // olhar se o arquivo ja existe
+  List entries;
+  list_new(&entries, sizeof(t2fs_record), free);
+  get_descriptor(cwd->dir_descriptor.MFTNumber, &cwd->dir_descriptor);
+  descriptorEntries(cwd->dir_descriptor, &entries);
+  if(exists(name, &entries, &record)) return ERROR; // nao pode criar se ja existe
+
+  // 0.
+  // create file structure to hold file descriptor and record
+  file_t f;
+
+  // 1.
+  // find free mft descriptor to hold the new file's blocks information
+  int mftNumber = get_free_descriptor(&f.file_descriptor);
+  for(int i=1; i<32; i++)
+    f.file_descriptor.tuple[i].atributeType = 0; // resets descriptor attr types
+
+  int free_logical_block = searchBitmap2(0);
+  if(free_logical_block <= 0)
+    return ERROR; // nao foi possivel achar um bloco livre
+  setBitmap2(free_logical_block, 1); // aloca o bloco
+
+  List file_tuples;
+  list_new(&file_tuples, sizeof(t2fs_4tupla), free);
+  write_descriptor(&f.file_descriptor, &file_tuples);
+  
+
+  // 2.
+  // create record of file
+  f.record.TypeVal = TYPEVAL_REGULAR;
+  strcpy(f.record.name, next);
+  f.record.blocksFileSize = 0;
+  f.record.bytesFileSize = 0;
+  f.record.MFTNumber = mftNumber;
+
+
+  // 3.
+  // write record in logical block
+  unsigned char buffer[256] = "";
+  memcpy(buffer, &f.record, sizeof(t2fs_record));
+  write_sector(logicalBlock_sector(free_logical_block), buffer);
+
+
+  // 4.
+  // append dir tuple to current descriptor list of tuples
+  t2fs_4tupla dir_t;
+  dir_t.atributeType = 1; // mapeamento
+  dir_t.virtualBlockNumber = 0;
+  dir_t.logicalBlockNumber = free_logical_block;
+  dir_t.numberOfContiguosBlocks = 0;
+
+  List cwd_tuples;
+  list_new(&cwd_tuples, sizeof(t2fs_4tupla), free);
+  descriptor_tuples(cwd->dir_descriptor, &cwd_tuples);
+  printf("tuple cwd (%s) size %d \n", cwd->record.name, list_size(&cwd_tuples));
+  // updates last tuple, to be a valid vbn-lbn mapped tuple (1),
+  // instead of a end tuple (0)
+  if(list_size(&cwd_tuples) > 0) {
+    t2fs_4tupla *last_tuple = list_pop_back(&cwd_tuples);
+    last_tuple->atributeType = 1;
+    list_push_back(&cwd_tuples, last_tuple);
+  }
+  list_push_back(&cwd_tuples, &dir_t);
+
+  t2fs_4tupla end;
+  end.atributeType = 0; // fim de encadeamento
+  end.virtualBlockNumber = 0;
+  end.logicalBlockNumber = 0;
+  end.numberOfContiguosBlocks = 0;
+  list_push_back(&cwd_tuples, &end);
+  printf("tuple cwd (%s) size %d \n", cwd->record.name, list_size(&cwd_tuples));
+
+  write_descriptor(&cwd->dir_descriptor, &cwd_tuples);
+
+  int handle = open2(f.record.name);
+  if(handle == ERROR) return ERROR;
+  else 
+    return handle;
 }
 
 
@@ -242,20 +355,23 @@ FILE2 open2 (char *filename)
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
 
-  if(filename[0] == '/') { // caminho absoluto
+  char *path = strdup(filename);
+  if(path == NULL) return ERROR;
+
+  if(path[0] == '/') { // caminho absoluto
     cwd = &root_directory;
   }
 
   // temos que colocar o cwd no caminho do arquivo a ser lido
   t2fs_record record;
-  char *next = strtok(filename, "/");
+  char *next = strtok(path, "/");
   while(cd(next, &record) != ERROR) {
     next = strtok(NULL, "/");
   }
   if(next == NULL) // leu tudo: usuario deu um caminho apenas com
     return ERROR; // pastas
 
-  char *name = strtok(next, "/");
+  char *name = next;
   // printf("next %s\n", next);
   // if(name != NULL) // casos do tipo "/folder1/folder2/arquivo" 
   //   return ERROR; // onde folder1 existe (cd OK), mas folder2 nao (cd ERROR)
@@ -351,16 +467,18 @@ int mkdir2 (char *pathname)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
-  
 
-  if(pathname[0] == '/') { // caminho absoluto
+  char *path = strdup(pathname);
+  if(path == NULL) return ERROR;
+
+  if(path[0] == '/') { // caminho absoluto
     cwd = &root_directory;
   }
 
   // temos que descobrir ate onde as pastas ja existem
   // e criar o resto
   t2fs_record rec;
-  char *next = strtok(pathname, "/");
+  char *next = strtok(path, "/");
   char read[1024] = ""; // o que ja foi lido
   while(cd(next, &rec) != ERROR) {
     strcat(read, next);
@@ -368,7 +486,7 @@ int mkdir2 (char *pathname)
 
     next = strtok(NULL, "/");
   }
-  if(next == NULL) // leu tudo: acessou todo o pathname
+  if(next == NULL) // leu tudo: acessou todo o path
     return ERROR; // caminho invalido porque pasta ja existe
 
   List entries;
@@ -487,14 +605,17 @@ int rmdir2 (char *pathname)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
+
+  char *path = strdup(pathname);
+  if(path == NULL) return ERROR;
   
-  if(pathname[0] == '/') { // caminho absoluto
+  if(path[0] == '/') { // caminho absoluto
     cwd = &root_directory;
   }
 
   // temos que colocar o cwd no caminho desejado
   t2fs_record rec;
-  char *next = strtok(pathname, "/");
+  char *next = strtok(path, "/");
   if(next == NULL) return ERROR; // nao pode remover root
   while(cd(next, &rec) != ERROR) {
     next = strtok(NULL, "/");
@@ -543,13 +664,16 @@ DIR2 opendir2 (char *pathname)
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
 
-  if(pathname[0] == '/') { // caminho absoluto
+  char *path = strdup(pathname);
+  if(path == NULL) return ERROR;
+
+  if(path[0] == '/') { // caminho absoluto
     cwd = &root_directory;
   }
 
   // tenta acessar o caminho especificado
   // se existir, teremos o diretorio em cwd
-  char *next = strtok(pathname, "/");
+  char *next = strtok(path, "/");
   directory dir;
   while(next != NULL && cd(next, &dir.record) != ERROR) {
     next = strtok(NULL, "/");
