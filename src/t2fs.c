@@ -92,7 +92,12 @@ bool print_entry(void *e) {
 }
 
 
-
+/* Iterative function (to be used with list_for_each)!!
+*  Takes a 4tuple, reads its LBN value and prints the content
+*  of the block.
+*
+*  Author: Arthur Lenz
+*/
 bool print_file_data(void *data) {
   t2fs_4tupla *tuple = (t2fs_4tupla*) data;
   if(tuple == NULL) return false;
@@ -106,6 +111,14 @@ bool print_file_data(void *data) {
   return true;
 }
 
+
+
+/* Takes a file record and a pointer to a buffer.
+*  Reads each one of the blocks mapped by the file
+*  and stores the content in the buffer.
+*
+*  Author: Arthur Lenz
+*/
 void read_file(t2fs_record file_r, char *data) {
   //looks for the descriptor of the file, in the mft
   descriptor file_d;
@@ -129,6 +142,11 @@ void read_file(t2fs_record file_r, char *data) {
 
 
 
+/* Iterative function (to be used with list_for_each)!!
+*  Compares a (valid) record with a given name.
+*
+*  Author: Arthur Lenz
+*/
 bool compare_record_by_name(void* entry, void *name) {
   // funcao comparadora
   // recebe um ponteiro para o objeto de tipo t2fs_record
@@ -141,7 +159,14 @@ bool compare_record_by_name(void* entry, void *name) {
 }
 
 
-
+/* Searches for the record given a name and a 
+*  list of entries (of type t2fs_record)
+*
+*  [output] t2fs_record *record: when found, a copy of the correspondent record
+*  [return] a boolean stating if the record exists in the given list
+*
+*  Author: Arthur Lenz
+*/
 bool exists(char* name, List *entries, t2fs_record *record) {
   // procura em uma lista de entradas (do tipo t2fs_record)
   // o record de nome desejado
@@ -155,6 +180,15 @@ bool exists(char* name, List *entries, t2fs_record *record) {
 
 
 
+
+/* Iterates over the opened directories array 
+*  looking for a free space
+*
+*  [return] the free space index, when found
+*           -1 if there is no free space available
+*
+*  Author: Arthur Lenz
+*/
 int get_valid_dir_handle() {
   // itera sobre o array de diretorios abertos
   // se um estiver livre (i.e. beingUsed = falso)
@@ -165,6 +199,16 @@ int get_valid_dir_handle() {
   return ERROR;
 }
 
+
+
+/* Iterates over the opened files array 
+*  looking for a free space
+*
+*  [return] the free space index, when found
+*           -1 if there is no free space available
+*
+*  Author: Arthur Lenz
+*/
 int get_valid_file_handle() {
   // look at get_valid_dir_handle
   for(int i=0; i<20; i++) {
@@ -175,6 +219,14 @@ int get_valid_file_handle() {
 
 
 
+/* Copies the name of the developers 
+*  in a given buffer (char * name) of a given size
+*
+*  [return] 0 when copied
+*           -1 whenever there's an error
+*
+*  Author: Arthur Lenz
+*/
 int identify2 (char *name, int size)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
@@ -190,6 +242,15 @@ int identify2 (char *name, int size)
 
 
 
+/* Creates a file in a given filepath (char *filename) 
+*  (After creating the file, opens it)
+*
+*  [return] the file handle (position where the information
+*           about the file is stored within the opened files array)
+*           -1 whenever there's an error
+*
+*  Author: Arthur Lenz
+*/
 FILE2 create2 (char *filename)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
@@ -298,6 +359,12 @@ FILE2 create2 (char *filename)
 
 
 
+/* Iterative function (to be used with list_for_each)!!
+*  Given a 4tuple, frees its logical block associated,
+*  clears the memory and sets it to -1 (free mft tuple)
+*
+*  Author: Arthur Lenz
+*/
 bool tuple_cleanup(void *t) {
   t2fs_4tupla *tuple = (t2fs_4tupla*) t;
   setBitmap2(tuple->logicalBlockNumber, 0); // free block
@@ -306,6 +373,15 @@ bool tuple_cleanup(void *t) {
   return true;
 }
 
+
+
+/* Deletes a file in a given filepath (char *filename) 
+*
+*  [return] 0 if succeeded
+*           -1 whenever there's an error
+*
+*  Author: Arthur Lenz
+*/
 int delete2 (char *filename)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
@@ -371,7 +447,15 @@ int delete2 (char *filename)
 }
 
 
-
+/* Changes the current working directory based on a give path (char* path)
+*
+*  [output] t2fs_record *record: the record of the directory
+*                                entered (cwd's record)
+*  [return] 0 if succeeded
+*           -1 whenever there's an error
+*
+*  Author: Arthur Lenz
+*/
 int cd(char* path, t2fs_record *record)
 {
   if(path == NULL || record == NULL) return ERROR;
@@ -419,7 +503,14 @@ int cd(char* path, t2fs_record *record)
 }
 
 
-
+/* Opens a file in a given filepath (char *filename) 
+*
+*  [return] the file handle (position where the information
+*           about the file is stored within the opened files array)
+*           -1 whenever there's an error
+*
+*  Author: Arthur Lenz
+*/
 FILE2 open2 (char *filename)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
@@ -470,7 +561,13 @@ FILE2 open2 (char *filename)
 }
 
 
-
+/* Closes a file given its associated handle 
+*
+*  [return] 0 if succeded
+*           -1 whenever there's an error
+*
+*  Author: Arthur Lenz
+*/
 int close2 (FILE2 handle)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
@@ -523,7 +620,14 @@ int truncate2 (FILE2 handle)
 }
 
 
-
+/* Sets the position of the stream pointer associated with
+*  an opened file, given its handle (FILE2 handle) and offset (DWORD offset) 
+*
+*  [return] 0 if succeded
+*           -1 whenever there's an error
+*
+*  Author: Arthur Lenz
+*/
 int seek2 (FILE2 handle, DWORD offset)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
@@ -551,6 +655,17 @@ int seek2 (FILE2 handle, DWORD offset)
 
 
 
+/* Creates one or multiple directories given a path
+*  Both absolute and relative paths are supported!
+*  [example]
+*    "/home/" - creates one folder, if home doesn't already exists
+*    "/home/desktop" - creates two folders, if they dont exist
+*
+*  [return] 0 if succeded
+*           -1 whenever there's an error
+*
+*  Author: Arthur Lenz
+*/
 int mkdir2 (char *pathname)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
@@ -690,6 +805,17 @@ bool find_by_tuple_record_name_and_invalidate(void *t, void* n) {
 
 
 
+/* Deletes one or multiple directories given a path
+*  Both absolute and relative paths are supported!
+*  [example]
+*    "/home/" - creates one folder, if home doesn't already exists
+*    "/home/desktop" - creates two folders, if they dont exist
+*
+*  [return] 0 if succeded
+*           -1 whenever there's an error
+*
+*  Author: Arthur Lenz
+*/
 int rmdir2 (char *pathname)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
@@ -748,6 +874,14 @@ int rmdir2 (char *pathname)
 
 
 
+/* Opens a directory given its path (char *pathname) 
+*
+*  [return] the file handle (position where the information
+*           about the directory is stored within the opened directories array)
+*           -1 whenever there's an error
+*
+*  Author: Arthur Lenz
+*/
 DIR2 opendir2 (char *pathname)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
@@ -789,7 +923,16 @@ DIR2 opendir2 (char *pathname)
 }
 
 
-
+/* Given its associated handle, outputs the information of its entries
+*  (both files and sub-directories)
+*  Each subsequent call returns the next entry within the directory.
+*
+*  [output] DIRENTRY *dentry: a DIRENT2 structure containing one entry
+*  [return] 0 if succeeded
+*           -1 whenever there's an error
+*
+*  Author: Arthur Lenz
+*/
 int readdir2 (DIR2 handle, DIRENT2 *dentry)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
@@ -835,6 +978,13 @@ int readdir2 (DIR2 handle, DIRENT2 *dentry)
 
 
 
+/* Closes a file given its associated handle 
+*
+*  [return] 0 if succeeded
+*           -1 whenever there's an error
+*
+*  Author: Arthur Lenz
+*/
 int closedir2 (DIR2 handle)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
