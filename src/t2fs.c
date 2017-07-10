@@ -42,6 +42,7 @@ bool mft_info_initialized = false;
 typedef struct file_t {
   descriptor file_descriptor;
   t2fs_record record;
+  char *data;
   int stream_position;
   bool opened;
 } file_t;
@@ -69,7 +70,7 @@ file_t opened_files[20] = {0}; //opened files
 int cd(char* path, t2fs_record *record);
 bool print_entry(void *e);
 bool print_file_data(void *data);
-void read_file(t2fs_record file_r);
+void read_file(t2fs_record file_r, char *data);
 bool compare_record_by_name(void* entry, void *name);
 bool exists(char* name, List *entries, t2fs_record *record);
 int get_valid_dir_handle();
@@ -105,7 +106,7 @@ bool print_file_data(void *data) {
   return true;
 }
 
-void read_file(t2fs_record file_r) {
+void read_file(t2fs_record file_r, char *data) {
   //looks for the descriptor of the file, in the mft
   descriptor file_d;
   get_descriptor(file_r.MFTNumber, &file_d);
@@ -116,7 +117,14 @@ void read_file(t2fs_record file_r) {
   descriptor_tuples(file_d, &valid_tuples);
 
   //for each valid tuple, read the data
-  list_for_each(&valid_tuples, print_file_data);
+  t2fs_4tupla tuple; // iterator
+  char buffer[256];
+  for(int i=0; i<list_size(&valid_tuples); i++) {
+    list_at(&valid_tuples, i, &tuple);
+    // reads the sector, based on the LBN given by the tuple
+    read_sector(logicalBlock_sector(tuple.logicalBlockNumber), (unsigned char*) buffer);
+    strcat(data, buffer);
+  }
 }
 
 
@@ -353,9 +361,9 @@ int delete2 (char *filename)
 
   // find the tuple to be clear, and do it
   // frees the block (doing that in the find_by_tuple... function)
-  t2fs_4tupla *tuple = list_find(&cwd_tuples, 
-                          find_by_tuple_record_name_and_invalidate,
-                          f.record.name);
+  // t2fs_4tupla *tuple = 
+  list_find(&cwd_tuples, find_by_tuple_record_name_and_invalidate,
+            f.record.name);
 
   write_descriptor(&cwd->dir_descriptor, &cwd_tuples);
 
@@ -442,8 +450,11 @@ FILE2 open2 (char *filename)
   
   if(!exists(name, &entries, &record)) return ERROR; // arquivo nao existe
 
+  // init file structure
   file_t f;
   f.record = record;
+  f.data = (char*) calloc(1, sizeof(char));
+  if(f.data == NULL) return ERROR; // calloc problem
   get_descriptor(f.record.MFTNumber, &f.file_descriptor);
   f.stream_position = 0;
   f.opened = true;
@@ -452,7 +463,8 @@ FILE2 open2 (char *filename)
   if(position == ERROR) return ERROR;
   opened_files[position] = f;
 
-  read_file(f.record);
+  read_file(f.record, f.data);
+  printf("data: %s\n", f.data);
 
   return position;
 }
@@ -516,8 +528,25 @@ int seek2 (FILE2 handle, DWORD offset)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
-  //to-do
-  return ERROR;
+
+  // posicao invalida
+  // [retorna -2 : nao pode usar o -1 do ERROR]
+  // handle fora do range valido
+  if(handle < 0 || handle >= 20) return -2;
+  // o diretorio nao esta aberto
+  if(!opened_files[handle].opened) return -2;
+
+  file_t *f = &opened_files[handle];
+
+  // valida o offset, checando se
+  // atual + offset ultrapassa o tamanho do arquivo
+  if(f->stream_position + offset > f->record.bytesFileSize) {
+    return ERROR;
+  }
+  else {
+    f->stream_position += offset;
+    return SUCCESS;
+  }
 }
 
 
