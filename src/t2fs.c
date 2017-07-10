@@ -593,10 +593,34 @@ int close2 (FILE2 handle)
 
 int read2 (FILE2 handle, char *buffer, int size)
 {
+  if(buffer == NULL) return ERROR;
+
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
-  //to-do
-  return ERROR;
+
+  // valida o handle:
+
+  // posicao invalida
+  // [retorna -2 : nao pode usar o -1 do ERROR]
+  // handle fora do range valido
+  if(handle < 0 || handle >= 20) return -2;
+  // o diretorio nao esta aberto
+  if(!opened_files[handle].opened) return -2;
+
+  file_t *f = &opened_files[handle];
+
+  int availableBytes = f->record.bytesFileSize - f->stream_position;
+
+  if(availableBytes >= size) { // tem 'size' bytes para escrever no buffer
+    strncpy(buffer, f->data+f->stream_position, size);
+    f->stream_position += size;
+    return size;
+  }
+  else { // nao tem, devemos copiar o que da e retornar o tamanho
+    strncpy(buffer, f->data+f->stream_position, availableBytes);
+    f->stream_position = f->record.bytesFileSize;
+    return availableBytes;    
+  }
 }
 
 
@@ -616,6 +640,7 @@ int truncate2 (FILE2 handle)
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
   //to-do
+
   return ERROR;
 }
 
@@ -807,7 +832,7 @@ bool find_by_tuple_record_name_and_invalidate(void *t, void* n) {
 
 /* Deletes one or multiple directories given a path
 *  Both absolute and relative paths are supported!
-*  [example]
+*  [example]//
 *    "/home/" - creates one folder, if home doesn't already exists
 *    "/home/desktop" - creates two folders, if they dont exist
 *
