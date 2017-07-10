@@ -639,9 +639,27 @@ int truncate2 (FILE2 handle)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
-  //to-do
 
-  return ERROR;
+
+  // clears on memory
+
+  // valida o handle:
+
+  // posicao invalida
+  // [retorna -2 : nao pode usar o -1 do ERROR]
+  // handle fora do range valido
+  if(handle < 0 || handle >= 20) return -2;
+  // o diretorio nao esta aberto
+  if(!opened_files[handle].opened) return -2;
+
+  file_t *f = &opened_files[handle];
+
+  memset(f->data+f->stream_position, 0, 
+         sizeof(f->record.bytesFileSize - f->stream_position));
+
+  f->record.bytesFileSize = f->stream_position;
+
+  return SUCCESS;
 }
 
 
@@ -669,11 +687,11 @@ int seek2 (FILE2 handle, DWORD offset)
 
   // valida o offset, checando se
   // atual + offset ultrapassa o tamanho do arquivo
-  if(f->stream_position + offset > f->record.bytesFileSize) {
+  if(offset > f->record.bytesFileSize) {
     return ERROR;
   }
   else {
-    f->stream_position += offset;
+    f->stream_position = offset;
     return SUCCESS;
   }
 }
