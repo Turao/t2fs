@@ -994,10 +994,8 @@ int rmdir2 (char *pathname)
 
   write_descriptor(&cwd->parent->dir_descriptor, &parent_tuples);
 
-  if(tuple == NULL) //record doesnt exist, consistency error
-    return ERROR;
-  else
-    return SUCCESS;
+  cwd = cwd->parent;
+  return SUCCESS;
 }
 
 
