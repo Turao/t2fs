@@ -51,5 +51,8 @@ list:
 	$(CC) -c $(SRC_DIR)/list.c -I$(INC_DIR) -Wall -m32
 	mv list.o $(BIN_DIR)
 
+rm-all-but-lib:
+	rm -rf $(BIN_DIR)/*.o $(SRC_DIR)/*~ $(INC_DIR)/*~ *~
+
 clean:
 	rm -rf $(LIB_DIR)/*.a $(BIN_DIR)/*.o $(SRC_DIR)/*~ $(INC_DIR)/*~ *~
