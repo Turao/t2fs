@@ -78,6 +78,8 @@ int get_valid_file_handle();
 bool find_by_tuple_record_name_and_invalidate(void *t, void* n);
 bool tuple_cleanup(void *t);
 int save_file(file_t *f);
+int save_record(descriptor parent, t2fs_record *r);
+bool find_by_tuple_record_and_overwrite(void *t, void *r);
 
 bool print_entry(void *e) {
   // t2fs_record *record = (t2fs_record*) e;
@@ -634,7 +636,49 @@ int read2 (FILE2 handle, char *buffer, int size)
   }
 }
 
+bool find_by_tuple_record_and_overwrite(void *t, void *r)
+{
+  t2fs_4tupla *tuple = (t2fs_4tupla*) t;
+  t2fs_record *record = (t2fs_record*) r;
 
+  int sector = logicalBlock_sector(tuple->logicalBlockNumber);
+  unsigned char buffer[256];
+  t2fs_record found[4]; // 4 records per sector
+  read_sector(sector, buffer);
+  memcpy(&found, buffer, sizeof(t2fs_record)*4);
+  for(int i=0; i<4; i++) {
+    if(strcmp(found[i].name, record->name) == 0 &&
+       found[i].TypeVal != TYPEVAL_INVALIDO) { // achou o registro na tupla
+      memcpy(&found[i], record, sizeof(t2fs_record)); // overwrite the record
+      memcpy(buffer, &found, sizeof(t2fs_record)*4);
+      write_sector(sector, buffer);
+      return true;
+    }
+  }
+  return false;
+}
+
+
+
+/* Writes a record (of type t2fs_record) into the disk
+*
+*  [return] 0 if succeded
+*           -1 whenever there's an error
+*
+*  Author: Arthur Lenz
+*/
+int save_record(descriptor parent, t2fs_record *r)
+{
+  // pega a lista de tuplas validas do descritor
+  List tuples;
+  list_new(&tuples, sizeof(t2fs_record), free);
+  descriptor_tuples(parent, &tuples);
+  t2fs_record found;
+  if(list_find(&tuples, find_by_tuple_record_and_overwrite, &found))
+    return SUCCESS;
+  else
+    return ERROR;
+}
 
 /* Writes a file (of type file_t) into the disk
 *
@@ -652,6 +696,11 @@ int read2 (FILE2 handle, char *buffer, int size)
 */
 int save_file(file_t *f)
 {
+  // sobrescreve as informacoes da entrada
+  // putz, tem que ir no pai pegar o descritor dele...
+  // eu nao guardo essa informacao agora
+  // save_record(, &f->record);
+
   // limpa todo o mapeamento atual no mft do arquivo
 
   // pega as tuplas do arquivo mapeado
