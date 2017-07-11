@@ -80,14 +80,14 @@ bool tuple_cleanup(void *t);
 int save_file(file_t *f);
 
 bool print_entry(void *e) {
-  t2fs_record *record = (t2fs_record*) e;
+  // t2fs_record *record = (t2fs_record*) e;
   
-  DEBUG_PRINT("name: %s \n", record->name);
-  DEBUG_PRINT("typeval: %x \n", record->TypeVal);
-  DEBUG_PRINT("block file size: %d \n", record->blocksFileSize);
-  DEBUG_PRINT("bytes file size: %d \n", record->bytesFileSize);
-  DEBUG_PRINT("mft number: %d \n", record->MFTNumber);
-  DEBUG_PRINT("\n");
+  // DEBUG_PRINT("name: %s \n", record->name);
+  // DEBUG_PRINT("typeval: %x \n", record->TypeVal);
+  // DEBUG_PRINT("block file size: %d \n", record->blocksFileSize);
+  // DEBUG_PRINT("bytes file size: %d \n", record->bytesFileSize);
+  // DEBUG_PRINT("mft number: %d \n", record->MFTNumber);
+  // DEBUG_PRINT("\n");
 
   return true;
 }
