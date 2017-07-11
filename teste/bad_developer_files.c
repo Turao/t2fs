@@ -2,7 +2,6 @@
 #include <stdlib.h>
 
 #include "t2fs.h"
-#include "utils.h"
 
 int main()
 {
@@ -47,5 +46,5 @@ int main()
 	else
 		printf("non-existent file stream pointer now in %d !\n", stream_pointer);
 
-	return SUCCESS;
+	return 0;
 }
