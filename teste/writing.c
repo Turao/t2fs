@@ -26,8 +26,8 @@ int main()
   else
     printf("%s succesfully created!\n", filename);
 
-  // escreve dados no arquivo
-  char content[] = "sisopi file content is here!";
+  // escreve dados no aqrquivo
+  char content[] = "sisopI file content is here!";
   int bytes_written = write2(handle, content, strlen(content));
   if(bytes_written < 0)
     printf("unable to write data. \n");
