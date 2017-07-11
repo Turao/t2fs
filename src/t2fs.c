@@ -589,6 +589,19 @@ int close2 (FILE2 handle)
 
 
 
+/* Reads a file given its associated handle
+*  and store 'size' bytes of its content into a buffer 
+*
+*  the reading starts from the position defined by the 
+*  file's internal stream pointer
+*
+*  [output] char *buffer: the bytes read from the file
+*
+*  [return] the number of bytes read
+*           a negative number whenever there is an error
+*
+*  Author: Arthur Lenz
+*/
 int read2 (FILE2 handle, char *buffer, int size)
 {
   if(buffer == NULL) return ERROR;
@@ -621,6 +634,22 @@ int read2 (FILE2 handle, char *buffer, int size)
   }
 }
 
+
+
+/* Writes a file (of type file_t) into the disk
+*
+*   IMPORTANT:
+*   DOES NOT SAVE THE FILE RECORD YET!!
+*   THIS LEADS TO INCONSISTENT DATA BEING READ
+*   
+*   THE FILE STRUCTURE MAINTAINS THE CORRECT DATA
+*   ONLY WHEN OPENED (when it's in memory)
+*
+*  [return] 0 if succeded
+*           -1 whenever there's an error
+*
+*  Author: Arthur Lenz
+*/
 int save_file(file_t *f)
 {
   // limpa todo o mapeamento atual no mft do arquivo
@@ -680,6 +709,19 @@ int save_file(file_t *f)
   return SUCCESS;
 }
 
+
+
+/* Writes the content of a given buffer into the
+*  file correspondent to the associated handle given
+*
+*  the writing starts from the position defined by the 
+*  file's internal stream pointer
+*
+*  [return] the number of bytes written
+*           a negative number whenever there is an error
+*
+*  Author: Arthur Lenz
+*/
 int write2 (FILE2 handle, char *buffer, int size)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
@@ -719,13 +761,24 @@ int write2 (FILE2 handle, char *buffer, int size)
 
 
 
+/* Clears the data within the
+*  file correspondent to the associated handle given
+*
+*  the cleaning process starts from the position defined by
+*  the file's internal stream pointer
+*
+*  [return] 0 if succeded
+*           -1 whenever there's an error
+*
+*  Author: Arthur Lenz
+*/
 int truncate2 (FILE2 handle)
 {
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
 
 
-  // clears on memory
+  // clears in memory
 
   // valida o handle:
 
@@ -908,6 +961,15 @@ int mkdir2 (char *pathname)
 
 
 
+/* Iterative function (to be used with list_for_each)!!
+*  Compares a (valid) tuple with a given name.
+*  If matched:
+*    the associated record is reseted (memory cleared)
+*    the associated sector is updated (overwritten)
+*    and its mapped logical block is free'd
+*
+*  Author: Arthur Lenz
+*/
 bool find_by_tuple_record_name_and_invalidate(void *t, void* n) {
   t2fs_4tupla *tuple = (t2fs_4tupla*) t;
   char *name = (char*) n;
