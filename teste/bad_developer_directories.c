@@ -3,6 +3,18 @@
 
 #include "t2fs.h"
 
+
+/*
+*     Simulamos o uso incorreto das funcoes de diretorio:
+*  - criacao de diretorio quando ha conflito de nomes com as 
+*  entradas do cwd (current working directory)
+*  - remocao de diretorio nao existente
+*  - abertura de diretario nao existente (handle invalido)
+*  - fechamento de diretario nao existente (handle invalido)
+*  - remocao do diretorio root
+*
+* Author: Arthur Lenz
+*/
 int main()
 {
 	char pathname[] = "./definitely_not_a_folder";

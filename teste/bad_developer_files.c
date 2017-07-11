@@ -3,6 +3,19 @@
 
 #include "t2fs.h"
 
+
+/*
+*     Simulamos o uso incorreto das funcoes de arquivo:
+*  - criacao de arquivo quando ha conflito de nomes com as 
+*  entradas do cwd (current working directory)
+*  - remocao de arquivo nao existente
+*  - abertura de arquivo nao existente (handle invalido)
+*  - fechamento de arquivo nao existente (handle invalido)
+*  - seek com handle invalido
+*  - seek em posicao invalida
+*
+* Author: Arthur Lenz
+*/
 int main()
 {
 	char filename[] = "./definitely_not_a_file";
