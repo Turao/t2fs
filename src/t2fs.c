@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
 #include <stdbool.h>
+#include <string.h>
 
 #define DEBUG false
 
@@ -257,7 +257,7 @@ FILE2 create2 (char *filename)
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
 
-  char *path = strdup(filename);
+  char *path = (char*) strdup(filename);
   if(path == NULL) return ERROR;
 
   if(path[0] == '/') { // caminho absoluto
@@ -387,7 +387,7 @@ int delete2 (char *filename)
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
 
-  char *path = strdup(filename);
+  char *path = (char*) strdup(filename);
   if(path == NULL) return ERROR;
 
   if(path[0] == '/') { // caminho absoluto
@@ -516,7 +516,7 @@ FILE2 open2 (char *filename)
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
 
-  char *path = strdup(filename);
+  char *path = (char*) strdup(filename);
   if(path == NULL) return ERROR;
 
   if(path[0] == '/') { // caminho absoluto
@@ -666,6 +666,7 @@ int save_file(file_t *f)
     for(int j=0; j<_bootBlock.blockSize; j++) {     
       // para cada setor dentro do bloco
       // copiamos os 256 bytes (SECTOR_SIZE) respectivos
+      memset(internal_buffer, 0, 256); // para evitar lixo
       memcpy(internal_buffer, f->data+internal_pointer, 256);
       internal_pointer += 256;
       if(write_sector(sector+j, internal_buffer) != SUCCESS) return ERROR;
@@ -684,6 +685,7 @@ int write2 (FILE2 handle, char *buffer, int size)
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
 
+
   // valida o handle:
   // posicao invalida
   // [retorna -2 : nao pode usar o -1 do ERROR]
@@ -700,22 +702,19 @@ int write2 (FILE2 handle, char *buffer, int size)
     memcpy(f->data+f->stream_position, buffer, size);
   }
   else {
-    // se a escrita ultrapassa o tamanho do arquivo
-
-    // calcula o q precisa sobrescrever
-    int untilEOF = f->record.bytesFileSize - f->stream_position;
-    memcpy(f->data+f->stream_position,
-    buffer, untilEOF);
-
-    int extra = size - untilEOF;
-    strncat(f->data+f->stream_position, buffer+untilEOF, extra); 
+    char *internal_buffer = (char*) calloc(f->stream_position+size+1, 
+                                           sizeof(char));
+    memcpy(internal_buffer, f->data, f->stream_position);
+    memcpy(internal_buffer, buffer, size);
+    free(f->data);
+    f->data = internal_buffer;
   }
   // atualiza os atributos do arquivo
   f->stream_position += size;
   f->record.bytesFileSize = sizeof(BYTE)*strlen(f->data);
 
-
-  return save_file(f);
+  if(save_file(f) == SUCCESS) return size;
+  else return ERROR;
 }
 
 
@@ -799,7 +798,7 @@ int mkdir2 (char *pathname)
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
 
-  char *path = strdup(pathname);
+  char *path = (char*) strdup(pathname);
   if(path == NULL) return ERROR;
 
   if(path[0] == '/') { // caminho absoluto
@@ -949,7 +948,7 @@ int rmdir2 (char *pathname)
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
 
-  char *path = strdup(pathname);
+  char *path = (char*) strdup(pathname);
   if(path == NULL) return ERROR;
   
   if(path[0] == '/') { // caminho absoluto
@@ -1013,7 +1012,7 @@ DIR2 opendir2 (char *pathname)
   if(!disk_info_initialized) INIT_DISK_INFO();
   if(!mft_info_initialized) INIT_MFT_INFO();
 
-  char *path = strdup(pathname);
+  char *path = (char*) strdup(pathname);
   if(path == NULL) return ERROR;
 
   if(path[0] == '/') { // caminho absoluto
