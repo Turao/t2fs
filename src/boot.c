@@ -7,6 +7,13 @@
 #include "boot.h"
 #include "utils.h"
 
+
+
+/* Reads the information within the boot block
+*  and initializes its associated global structure
+*
+*  Author: Arthur Lenz
+*/
 bool init_t2fs_bootBlock()
 {
   DEBUG_PRINT("Initializing boot block info \n");
@@ -30,6 +37,12 @@ bool init_t2fs_bootBlock()
 }
 
 
+
+/* Given a logical block number, outputs its initial
+*  sector
+*
+*  Author: Arthur Lenz
+*/
 int logicalBlock_sector(int logicalBlockNumber)
 {
   return logicalBlockNumber * _bootBlock.blockSize;

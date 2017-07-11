@@ -11,18 +11,28 @@
 #include "utils.h"
 
 
+
+/* Reads the information within the mft block
+*  and initializes both bitmap and root descriptor structures
+*
+*  Author: Arthur Lenz
+*/
 bool init_mft_info()
 {
   DEBUG_PRINT("Initializing mft info \n");
   get_descriptor(0, &_bitmap_d);
   get_descriptor(1, &_root_d);
 
-  cwdDescriptor = _root_d;
-
   return true;
 }
 
 
+
+/* Given the MFT number, stores the associated 
+*  MFT descriptor into 'descriptor *d'
+*
+*  Author: Arthur Lenz
+*/
 void get_descriptor(int number, descriptor *d)
 {
   unsigned char descriptor_buffer[512];
@@ -32,6 +42,14 @@ void get_descriptor(int number, descriptor *d)
 }
 
 
+
+/* Searches through the MFT descriptors for a not used one
+*  and stores the associated MFT descriptor into 'descriptor *d'
+*
+*  [return] the descriptor number, when found
+*
+*  Author: Arthur Lenz
+*/
 int get_free_descriptor(descriptor *descriptor)
 {
   int mftSize = (_bootBlock.MFTBlocksSize * _bootBlock.blockSize);
@@ -45,6 +63,12 @@ int get_free_descriptor(descriptor *descriptor)
 }
 
 
+
+/* Given a descriptor number, outputs its initial
+*  sector
+*
+*  Author: Arthur Lenz
+*/
 int descriptor_sector(int descriptor)
 { 
   return _bootBlock.blockSize + //skips boot sector
@@ -52,6 +76,14 @@ int descriptor_sector(int descriptor)
 }
 
 
+
+/* Given the MFT number, stores the associated 
+*  MFT descriptor data into a buffer
+*
+*  [output] unsigned char *buffer: the MFT descriptor data
+*
+*  Author: Arthur Lenz
+*/
 void read_descriptor(int number, unsigned char buffer[])
 {
   int sector = descriptor_sector(number);
@@ -63,6 +95,14 @@ void read_descriptor(int number, unsigned char buffer[])
 }
 
 
+
+/* Given the MFT descriptor, stores the associated 
+*  MFT descriptor VALID (mapped) tuples in a list
+*
+*  [output] List *tuples: the MFT descriptor valid (mapped) tuples
+*
+*  Author: Arthur Lenz
+*/
 void descriptor_tuples(descriptor d, List *tuples)
 {
   int i = 0;
@@ -90,6 +130,14 @@ void descriptor_tuples(descriptor d, List *tuples)
 }
 
 
+
+/* Given the MFT descriptor, stores the associated 
+*  MFT descriptor entries
+*
+*  [output] List *entries: the MFT descriptor entries
+*
+*  Author: Arthur Lenz
+*/
 void descriptorEntries(descriptor d, List *entries)
 {
   int sector;
@@ -120,6 +168,17 @@ void descriptorEntries(descriptor d, List *entries)
   }
 }
 
+
+
+/* Given the MFT descriptor and a list of valid (mapped) tuples
+*  updates the descriptor's internal t2fs_4tupla array
+*  while also overwriting the disk correspondent descriptor
+*
+*  [return] 0 if succeded
+*           -1 whenever there's an error
+*
+*  Author: Arthur Lenz
+*/
 int write_descriptor(descriptor *d, List *tuples)
 {
   int size = list_size(tuples);
