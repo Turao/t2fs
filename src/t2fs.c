@@ -988,9 +988,9 @@ int rmdir2 (char *pathname)
   // find the tuple to be clear, and do it
   // 5.
   // frees the block (doing that in the find_by_tuple... function)
-  t2fs_4tupla *tuple = list_find(&parent_tuples, 
-                          find_by_tuple_record_name_and_invalidate,
-                          cwd->record.name);
+  list_find(&parent_tuples, 
+            find_by_tuple_record_name_and_invalidate,
+            cwd->record.name);
 
   write_descriptor(&cwd->parent->dir_descriptor, &parent_tuples);
 
