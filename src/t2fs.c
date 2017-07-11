@@ -77,6 +77,7 @@ int get_valid_dir_handle();
 int get_valid_file_handle();
 bool find_by_tuple_record_name_and_invalidate(void *t, void* n);
 bool tuple_cleanup(void *t);
+int save_file(file_t *f);
 
 bool print_entry(void *e) {
   t2fs_record *record = (t2fs_record*) e;
@@ -554,7 +555,6 @@ FILE2 open2 (char *filename)
   opened_files[position] = f;
 
   read_file(f.record, f.data);
-  printf("data: %s\n", f.data);
 
   return position;
 }
@@ -583,7 +583,6 @@ int close2 (FILE2 handle)
   // so "liberamos" a vaga, setando beingUsed
   // para falso
   opened_files[handle].opened = false;
-
 
   return ERROR;
 }
