@@ -1,14 +1,24 @@
-#
-# Makefile ESQUELETO
-#
-# DEVE ter uma regra "all" para geração da biblioteca
-# regra "clean" para remover todos os objetos gerados.
-#
-# NECESSARIO adaptar este esqueleto de makefile para suas necessidades.
-#
-# 
+# Sobre as flags:
 
-CC=gcc
+# std=c99
+# ta cheio de for com declaracao dentro
+# vide: boa pratica de deixar variaveis perto do uso
+
+# m32
+# os objs passados foram compilados em 32bit
+# a vm e 32bit
+#
+
+# IMPORTANTE:
+# PODE DAR PROBLEMA COM ESSA FLAG!!!
+# As maquinas dos labs (pelo menos os de estudo) NAO possuem suporte
+# para essa flag (nao tem a libc6-dev-i386)
+# (E eu como aluno, nao tinha permissao pra instalar)
+
+CFLAGS=-std=c99 -m32
+
+
+CC=gcc $(CFLAGS)
 LIB_DIR=./lib/
 INC_DIR=./include/
 BIN_DIR=./bin/
