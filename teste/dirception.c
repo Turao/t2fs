@@ -2,8 +2,17 @@
 #include <stdlib.h>
 
 #include "t2fs.h"
-#include "utils.h"
 
+/*
+*   Deseja-se testar a criacao de multiplas pastas dado um caminho 
+* (que pode ser tanto relativo quanto absoluto).
+*   Na implementacao atual, a funcao mkdir cria todas as pastas nao existentes
+* no caminho dado (similar ao comando mkdir -p do unix). 
+*   Apos a criacao dos diretorios, realizamos a impressao das entradas de cada 
+* pasta criada.
+*
+* Author: Arthur Lenz
+*/
 int main()
 {
   char pathname[] = "/f1/f2/f3/";
