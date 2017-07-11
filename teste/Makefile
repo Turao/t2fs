@@ -1,8 +1,11 @@
 # Sobre as flags:
 
-# std=c99
-# ta cheio de for com declaracao dentro
-# vide: boa pratica de deixar variaveis perto do uso
+# std=gnu99
+# usa strdup pra nao estragar a string passada por parametro
+# em algumas funcoes
+#
+# e ta cheio de for com declaracao dentro tambem
+# (vide: boa pratica de deixar variaveis perto do uso)
 
 # m32
 # os objs passados foram compilados em 32bit
@@ -15,7 +18,7 @@
 # para essa flag (nao tem a libc6-dev-i386)
 # (E eu como aluno, nao tinha permissao pra instalar)
 
-CFLAGS=-std=c99 -m32
+CFLAGS=-std=gnu99 -m32
 
 CC=gcc $(CFLAGS)
 LIB_DIR=../lib
